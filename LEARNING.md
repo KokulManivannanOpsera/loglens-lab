@@ -13,8 +13,8 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 
 | Track | Done | Next |
 |-------|------|------|
-| AI | A0 | A1 (or D1 first) |
-| DevOps / CI/CD / Cloud | D0 | D1 |
+| AI | A0 | A1 |
+| DevOps / CI/CD / Cloud | D0, D1 | D2 Dockerfile (or A1) |
 
 **Suggested interleave**
 
@@ -151,8 +151,9 @@ Pre-train foundation models, full RLHF research, vision/audio/video products, 10
 ### D0 — Local app ✅
 - [x] Client–server, `npm run dev` `:8091`, `/api/health`
 
-### D1 — Git branch + PR
-- [ ] Branch, commit, PR, protect `main`
+### D1 — Git branch + PR ✅
+- [x] Branch, commit, PR, protect `main`  
+**How:** this repo on GitHub; branch `docs/d1-git-pr-habit`; see [GIT_PR.md](./GIT_PR.md)
 
 ### D2 — Dockerfile
 - [ ] Image vs container, layers, `-p`, volumes, multi-stage/standalone
@@ -290,10 +291,7 @@ Developer → PR → CI (lint/test/eval/build/scan)
 ### A0 / D0
 - Scaffolded Next.js LogLens; mock diagnose; fixtures; health on `:8091`.
 
-### _(add next)_
-<!-- 
 ### D1
-- date:
-- what built:
-- prove aloud:
--->
+- date: 2026-10-19
+- what built: git init; `main` = A0 baseline; branch + PR for D1 docs; GitHub remote
+- prove aloud: branch keeps `main` safe; PR shows the diff before merge

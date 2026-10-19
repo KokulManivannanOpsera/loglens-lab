@@ -31,6 +31,6 @@ npm test
 | Track | Next |
 |-------|------|
 | AI | A1 real LLM |
-| DevOps | D1 Git/PR |
+| DevOps | D2 Dockerfile (D1 done — see [GIT_PR.md](./GIT_PR.md)) |
 
 Todo lab (`labs/todo-devops`) = Docker practice history; **LogLens is the main path**.
