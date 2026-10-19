@@ -1,19 +1,25 @@
 import { NextResponse } from "next/server";
-import { mockDiagnose } from "@/lib/mockDiagnose";
-import type { DiagnoseResponse } from "@/lib/types";
+import { runDiagnose } from "@/lib/runDiagnose";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { logText?: string; fixtureId?: string };
-  const logText = body.logText ?? "";
-
-  const diagnosis = mockDiagnose(logText);
-  const response: DiagnoseResponse = {
-    diagnosis,
-    meta: {
-      logChars: logText.length,
-      fixtureHint: body.fixtureId ?? null,
-    },
+  const body = (await request.json()) as {
+    logText?: string;
+    fixtureId?: string;
+    mode?: string;
   };
 
-  return NextResponse.json(response);
+  try {
+    const response = await runDiagnose({
+      logText: body.logText ?? "",
+      fixtureId: body.fixtureId,
+      mode: body.mode,
+    });
+    return NextResponse.json(response);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "diagnose failed";
+    return NextResponse.json(
+      { error: message, hint: "Set OPENAI_API_KEY or use mode=mock / DIAGNOSE_MODE=auto" },
+      { status: 502 },
+    );
+  }
 }

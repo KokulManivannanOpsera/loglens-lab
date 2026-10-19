@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
-  // `output: "standalone"` comes back at DevOps D2 (Docker) — keeps `npm start` simple in A0
+  // Keep tracing inside this lab (parent DeployOS / home lockfiles confuse Next)
+  outputFileTracingRoot: path.join(__dirname),
 };
 
 export default nextConfig;
