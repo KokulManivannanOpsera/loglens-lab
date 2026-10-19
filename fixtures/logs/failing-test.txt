@@ -1,0 +1,8 @@
+2024-10-01T10:00:01Z INFO  Starting test suite payment-service
+2024-10-01T10:00:02Z INFO  Connected to mock DB
+2024-10-01T10:00:05Z INFO  Running test: charges.isRejectedWhenCardExpired
+2024-10-01T10:00:06Z ERROR AssertionError: expected 200 to equal 402
+    at Object.<anonymous> (tests/charges.test.js:42:18)
+2024-10-01T10:00:06Z INFO  Related commit: a1b2c3d "relax card expiry check in charges controller"
+2024-10-01T10:00:07Z ERROR 1 failing
+2024-10-01T10:00:07Z INFO  CI job failed: unit-tests
