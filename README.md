@@ -1,37 +1,46 @@
 # LogLens Lab
 
-**CI log → draft diagnosis** — learn **AI engineering + DevOps** on one small app.
+**CI log → draft diagnosis** — learn **AI engineering + DevOps** on one app.
 
-**Phase A1 (now):** React + Node (Next.js). **OpenAI** when `OPENAI_API_KEY` is set; otherwise **mock** (A0).
+**Architecture (now):** separated **React client** + **Node (Express) API**.
+
+```text
+Browser :5173  ──proxy /api──►  Express API :8091  ──►  OpenAI (optional)
+```
 
 ## Run
 
 ```bash
 cd labs/loglens
 npm install
-cp .env.example .env.local   # optional: add OPENAI_API_KEY
-npm run dev
+
+# terminal 1 — API
+cp server/.env.example server/.env   # optional: add OPENAI_API_KEY
+npm run dev:server
+
+# terminal 2 — UI
+npm run dev:client
 ```
 
-Open [http://localhost:8091](http://localhost:8091).
+Open **http://localhost:5173** (UI). API health: **http://localhost:8091/api/health**.
 
-- Load a fixture → **Diagnose**
-- Health: [http://localhost:8091/api/health](http://localhost:8091/api/health) (`llmConfigured: true/false`)
+Vite proxies `/api/*` from the UI to the API, so `fetch("/api/diagnose")` works without CORS pain in dev.
 
 ## Tests
 
+With the API running on 8091:
+
 ```bash
-# with app running on 8091
 npm test
 ```
 
-## Learning tracker (everything in one file)
+## Learning
 
-**[LEARNING.md](./LEARNING.md)** — AI ladder + DevOps + full CI/CD + cloud + checklists + progress log.
+- Tracker: [LEARNING.md](./LEARNING.md)
+- Flow diagram: [PRODUCT_FLOW.html](./PRODUCT_FLOW.html)
+- Git/PR: [GIT_PR.md](./GIT_PR.md)
 
 | Track | Next |
 |-------|------|
-| AI | A1b / A1c or D6 secrets |
-| DevOps | D2 Dockerfile (see [GIT_PR.md](./GIT_PR.md)) |
-
-Todo lab (`labs/todo-devops`) = Docker practice history; **LogLens is the main path**.
+| AI | Merge A1 PR if open; then A1b / A1c or D6 |
+| DevOps | D2 Dockerfile (client+server images or one compose) |

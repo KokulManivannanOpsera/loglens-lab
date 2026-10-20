@@ -7,14 +7,17 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 
 **Honesty:** “All” = applied build/ship skills. Not training GPT from scratch / RLHF research (see Out of scope).
 
+**Visual (all tools + roles):** open [`PRODUCT_FLOW.html`](./PRODUCT_FLOW.html) in a browser — AI + CI/CD + cloud on one diagram.
+
 ---
 
 ## Status dashboard
 
 | Track | Done | Next |
 |-------|------|------|
-| AI | A0, A1 | A1b truncation depth / A1c injection hardening / D6 secrets |
-| DevOps / CI/CD / Cloud | D0, D1 | D2 Dockerfile or D6 (for real key in prod) |
+| AI | A0, A1 | A1b / A1c / D6 secrets |
+| DevOps / CI/CD / Cloud | D0, D1 | D2 Docker (now two services: client + server) |
+| Architecture | Next monolith → **React client + Express API** | Compose will run both |
 
 **Suggested interleave**
 
@@ -302,3 +305,8 @@ Developer → PR → CI (lint/test/eval/build/scan)
 - date: 2026-10-20
 - what built: OpenAI path + mock fallback; `.env.example`; meta latency/fallback; soft truncate
 - prove aloud: same Diagnosis JSON for mock and openai; key never in git; draft still ≠ action
+
+### Split client/server
+- date: 2026-10-20
+- what built: Vite React `client/` + Express `server/`; Vite proxies `/api` → `:8091`
+- prove aloud: browser is client; Express is server; Next monolith removed

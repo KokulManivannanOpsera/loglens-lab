@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LogLens — complete product flow (AI + CI/CD)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+      :root {
+        --bg: #0a0f14;
+        --panel: #141c26;
+        --line: #2a3749;
+        --text: #e8eef6;
+        --muted: #8fa0b8;
+        --ai: #3ecf8e;
+        --cd: #3d9cf0;
+        --cloud: #f0b429;
+        --warn: #e87a5d;
+        --done: #2a9a68;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "DM Sans", system-ui, sans-serif;
+        background:
+          radial-gradient(ellipse 80% 50% at 100% 0%, #13281f 0%, transparent 45%),
+          radial-gradient(ellipse 60% 40% at 0% 0%, #152033 0%, transparent 40%),
+          var(--bg);
+        color: var(--text);
+        line-height: 1.5;
+      }
+      .wrap { max-width: 1100px; margin: 0 auto; padding: 2.25rem 1.25rem 4rem; }
+      .eyebrow { margin: 0 0 0.4rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ai); }
+      h1 { margin: 0 0 0.5rem; font-size: clamp(1.6rem, 3.5vw, 2.2rem); letter-spacing: -0.03em; }
+      .lead { margin: 0 0 1.75rem; color: var(--muted); max-width: 46rem; }
+      h2 { margin: 2.5rem 0 0.6rem; font-size: 1.2rem; }
+      h2 span { color: var(--muted); font-weight: 500; font-size: 0.85rem; margin-left: 0.35rem; }
+      .note { color: var(--muted); font-size: 0.92rem; margin: 0 0 1rem; }
+      .diagram {
+        background: #0f1620;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 1rem 0.75rem 0.25rem;
+        overflow-x: auto;
+        margin-bottom: 1rem;
+      }
+      .legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0 0 1.5rem; font-size: 0.8rem; }
+      .legend span { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--muted); }
+      .dot { width: 0.65rem; height: 0.65rem; border-radius: 50%; }
+      .dot.ai { background: var(--ai); }
+      .dot.cd { background: var(--cd); }
+      .dot.cloud { background: var(--cloud); }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 0.75rem;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 0.9rem 1rem;
+        border-top: 3px solid var(--accent, var(--cd));
+      }
+      .card.done { outline: 1px solid rgba(62, 207, 142, 0.35); }
+      .card h3 { margin: 0 0 0.25rem; font-size: 0.92rem; }
+      .card .tag {
+        font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+        color: var(--accent, var(--cd)); margin-bottom: 0.35rem;
+      }
+      .card p { margin: 0; font-size: 0.84rem; color: var(--muted); }
+      .card code { font-family: "JetBrains Mono", monospace; font-size: 0.75rem; color: var(--text); }
+      footer {
+        margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line);
+        font-size: 0.8rem; color: var(--muted);
+      }
+      footer a { color: var(--ai); }
+      .trust {
+        background: rgba(232, 122, 93, 0.08);
+        border: 1px solid rgba(232, 122, 93, 0.35);
+        border-radius: 10px;
+        padding: 0.85rem 1rem;
+        font-size: 0.9rem;
+        margin: 1rem 0 1.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <p class="eyebrow">LogLens lab · basics day</p>
+      <h1>How AI + CI/CD + cloud work together</h1>
+      <p class="lead">
+        One product, two tracks that meet in production: <strong>ship the app</strong> (Git → CI → image → cloud)
+        and <strong>run the brain</strong> (mock → LLM → RAG → eval → agents). Every tool from
+        <code>LEARNING.md</code> appears below with its role.
+      </p>
+
+      <div class="trust">
+        <strong>Trust rule:</strong> diagnosis is always a <em>draft</em>. Humans approve any real-world side effect
+        (PR comment, ticket, re-run). Eval + guards come before automation.
+      </div>
+
+      <div class="legend">
+        <span><i class="dot ai"></i> AI / app brain</span>
+        <span><i class="dot cd"></i> CI/CD / ship</span>
+        <span><i class="dot cloud"></i> Cloud / run</span>
+      </div>
+
+      <h2>1. Master flow <span>end-to-end</span></h2>
+      <p class="note">Top swimlane = how code becomes a live URL. Bottom = what happens when a user pastes a log.</p>
+
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TB
+  subgraph ship ["SHIP PATH — CI/CD + cloud"]
+    direction LR
+    Dev["Developer IDE"] --> Git["Git branch"]
+    Git --> PR["GitHub PR"]
+    PR --> CI["CI: GitHub Actions"]
+    CI --> Lint["Lint + tests"]
+    Lint --> Eval["AI eval suite"]
+    Eval --> Build["Docker build"]
+    Build --> Scan["Image scan Trivy/Grype"]
+    Scan --> Reg["Registry GHCR/ECR"]
+    Reg --> CD["CD pipeline"]
+    CD --> Stg["Staging"]
+    Stg --> Approve["Approval / flags"]
+    Approve --> Prod["Production"]
+  end
+
+  subgraph cloud ["CLOUD RUNTIME"]
+    direction TB
+    Prod --> Compute["Compute PaaS or ECS/CloudRun/K8s"]
+    Compute --> Secrets["Secrets store LLM key"]
+    Compute --> DB["Postgres + pgvector"]
+    Compute --> HTTPS["HTTPS load balancer / DNS"]
+    Compute --> Obs["Logs metrics alerts"]
+  end
+
+  subgraph brain ["AI PATH — inside the running app"]
+    direction LR
+    User["User browser"] --> UI["LogLens UI React"]
+    UI --> API["Next.js API /diagnose"]
+    API --> Trunc["A1b truncate context"]
+    Trunc --> Inject["A1c treat log untrusted"]
+    Inject --> Route{"A7 route model?"}
+    Route -->|cheap| Mini["Small LLM"]
+    Route -->|hard| Big["Strong LLM"]
+    Mini --> RAG
+    Big --> RAG
+    RAG["A2 RAG retrieve runbooks"] --> Emb["A2b embeddings / vector DB"]
+    Emb --> LLM["LLM + system/user prompts"]
+    LLM --> Struct["Structured Diagnosis JSON"]
+    Struct --> Stream["A5 stream to UI"]
+    Stream --> HITL["Human review A0/A4b"]
+    HITL --> Feedback["A3c thumbs → eval set"]
+    HITL --> Agent{"A4 agent tools?"}
+    Agent -->|search/grep| Tools["Tool loop + max steps"]
+    Agent -->|write action| Guard["A4b approve / deny"]
+    Tools --> Struct
+  end
+
+  Secrets -.->|API key at runtime| LLM
+  DB -.->|history A6 + vectors| Emb
+  Eval -.->|golden fixtures| Struct
+  Obs -.->|A3b latency tokens| API
+  Feedback -.->|improve| Eval
+  CI -.->|fail closed| PR
+        </pre>
+      </div>
+
+      <h2>2. Simpler spine <span>say this aloud</span></h2>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+  Code["Code change"] --> PR2["PR"]
+  PR2 --> Green["CI green"]
+  Green --> Image["Docker image"]
+  Image --> Cloud2["Cloud + secrets"]
+  Cloud2 --> App["LogLens live"]
+  App --> Draft["Draft diagnosis"]
+  Draft --> Human["Human decides"]
+  Human -->|fix prompts/app| Code
+        </pre>
+      </div>
+
+      <h2>3. Every tool — role in the product</h2>
+      <p class="note">Green outline = already done in the lab (A0, A1, D0, D1).</p>
+
+      <h2 style="font-size:1rem;margin-top:1.5rem">AI / product brain</h2>
+      <div class="grid">
+        <article class="card done" style="--accent:var(--ai)">
+          <div class="tag">A0 · done</div>
+          <h3>Mock diagnoser + fixtures</h3>
+          <p>Fake “model” with rules. Same JSON shape as real LLM. Learn product without an API key.</p>
+        </article>
+        <article class="card done" style="--accent:var(--ai)">
+          <div class="tag">A1 · done</div>
+          <h3>LLM API · OpenAI</h3>
+          <p>External model. System + user prompts. Returns structured diagnosis. Key in env.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A1b</div>
+          <h3>Context window / truncation</h3>
+          <p>Logs can exceed model desk size. Keep head+errors+tail so the failure line isn’t dropped.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A1c</div>
+          <h3>Prompt injection defenses</h3>
+          <p>Log text is untrusted. “Ignore rules / auto-approve” must not change privileges.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A2</div>
+          <h3>RAG · runbooks</h3>
+          <p>Retrieve known-failure docs, stuff into prompt, cite evidence. Grounded answers.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A2b</div>
+          <h3>Embeddings · vector DB</h3>
+          <p>Turn chunks into vectors; similarity search (+ keyword hybrid). Often <code>pgvector</code>.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A3</div>
+          <h3>Eval suite</h3>
+          <p>Golden logs → expected cause. Catches prompt regressions. Runs inside CI.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A3b</div>
+          <h3>AI observability</h3>
+          <p>Latency, token use, ungrounded rate, prompt version — without leaking secrets.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A3c</div>
+          <h3>Human feedback</h3>
+          <p>Thumbs up/down → grow the eval set. Product learning loop.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A4</div>
+          <h3>Tools · light agent</h3>
+          <p>Model may call search/grep. Loop with max steps. Optional LangGraph later.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A4b</div>
+          <h3>Agent safety · guardrails</h3>
+          <p>Allowlists, shadow mode, audit trail, approve before any write.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A5</div>
+          <h3>Streaming</h3>
+          <p>Tokens to UI as they arrive; cancel mid-flight.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A6</div>
+          <h3>Memory · cache</h3>
+          <p>Store diagnosis history; cache same log hash to save cost.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A7</div>
+          <h3>Multi-model routing</h3>
+          <p>Cheap model triage → strong model for hard cases; provider fallback.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">A8 optional</div>
+          <h3>Light fine-tune</h3>
+          <p>Only if RAG+prompts plateau. Small adapter — not train GPT from scratch.</p>
+        </article>
+        <article class="card" style="--accent:var(--ai)">
+          <div class="tag">Runtime libs</div>
+          <h3>Next.js · React · Node</h3>
+          <p>UI + API in one app. <code>fetch</code> to OpenAI (no SDK required in A1).</p>
+        </article>
+      </div>
+
+      <h2 style="font-size:1rem;margin-top:2rem">CI/CD · ship path</h2>
+      <div class="grid">
+        <article class="card done" style="--accent:var(--cd)">
+          <div class="tag">D0 · done</div>
+          <h3>Local run · health</h3>
+          <p><code>npm run dev</code>, <code>/api/health</code>. Proves process is alive.</p>
+        </article>
+        <article class="card done" style="--accent:var(--cd)">
+          <div class="tag">D1 · done</div>
+          <h3>Git · GitHub · PR</h3>
+          <p>History, branches, review. <code>main</code> stays known-good.</p>
+        </article>
+        <article class="card" style="--accent:var(--cd)">
+          <div class="tag">D2</div>
+          <h3>Dockerfile</h3>
+          <p>Package app + Node into an <strong>image</strong>. Same binary everywhere.</p>
+        </article>
+        <article class="card" style="--accent:var(--cd)">
+          <div class="tag">D3</div>
+          <h3>docker compose</h3>
+          <p>One command to start app (+ later DB) with networks/volumes.</p>
+        </article>
+        <article class="card" style="--accent:var(--cd)">
+          <div class="tag">D4</div>
+          <h3>GitHub Actions CI</h3>
+          <p>On every PR: lint, test, AI eval, build. Red check = no merge.</p>
+        </article>
+        <article class="card" style="--accent:var(--cd)">
+          <div class="tag">D10</div>
+          <h3>Registry · scan</h3>
+          <p>Push <code>image:git-sha</code> to GHCR/ECR. Trivy/Grype/Dependabot for CVEs.</p>
+        </article>
+        <article class="card" style="--accent:var(--cd)">
+          <div class="tag">D9</div>
+          <h3>CD · promote</h3>
+          <p>Same artifact → staging → prod. Rollback, approvals, feature flags.</p>
+        </article>
+        <article class="card" style="--accent:var(--cd)">
+          <div class="tag">Also</div>
+          <h3>Jenkins / GitLab CI / Argo / Flux</h3>
+          <p>Same CI/CD jobs; GitOps syncs cluster from Git (after K8s).</p>
+        </article>
+      </div>
+
+      <h2 style="font-size:1rem;margin-top:2rem">Cloud · where it runs</h2>
+      <div class="grid">
+        <article class="card" style="--accent:var(--cloud)">
+          <div class="tag">D5</div>
+          <h3>PaaS · Railway / Render / Fly</h3>
+          <p>Fast public HTTPS URL. Learn deploy before raw AWS.</p>
+        </article>
+        <article class="card" style="--accent:var(--cloud)">
+          <div class="tag">D6</div>
+          <h3>Secrets</h3>
+          <p>LLM key + DB URL in host/CI secrets — never git. Vault / AWS SM / platform env.</p>
+        </article>
+        <article class="card" style="--accent:var(--cloud)">
+          <div class="tag">D7</div>
+          <h3>Managed Postgres</h3>
+          <p>History + later vectors (<code>pgvector</code>). RDS / Cloud SQL / PaaS add-on.</p>
+        </article>
+        <article class="card" style="--accent:var(--cloud)">
+          <div class="tag">D8</div>
+          <h3>Platform observability</h3>
+          <p>Logs, metrics, traces, alerts (CloudWatch / Datadog / etc.).</p>
+        </article>
+        <article class="card" style="--accent:var(--cloud)">
+          <div class="tag">D11</div>
+          <h3>Terraform / Pulumi</h3>
+          <p>Declare cloud resources as code instead of only clicking consoles.</p>
+        </article>
+        <article class="card" style="--accent:var(--cloud)">
+          <div class="tag">D12</div>
+          <h3>Kubernetes</h3>
+          <p>Orchestrate many containers. Local kind/minikube first; EKS/GKE later.</p>
+        </article>
+        <article class="card" style="--accent:var(--cloud)">
+          <div class="tag">D13</div>
+          <h3>Cloud IAM</h3>
+          <p>Least privilege: deploy role ≠ runtime role. No root keys on laptops.</p>
+        </article>
+        <article class="card" style="--accent:var(--cloud)">
+          <div class="tag">Building blocks</div>
+          <h3>Compute · LB · DNS · VPC</h3>
+          <p>EC2/ECS/Cloud Run, load balancer + TLS, Route53-style DNS, private DB network.</p>
+        </article>
+      </div>
+
+      <h2>4. How the two tracks meet</h2>
+      <div class="grid">
+        <article class="card" style="--accent:var(--warn)">
+          <h3>CI needs AI eval</h3>
+          <p>A3 golden tests run in D4 so a bad prompt can’t merge.</p>
+        </article>
+        <article class="card" style="--accent:var(--warn)">
+          <h3>LLM needs secrets</h3>
+          <p>A1 key only works safely with D6 in staging/prod.</p>
+        </article>
+        <article class="card" style="--accent:var(--warn)">
+          <h3>RAG needs data store</h3>
+          <p>A2b vectors usually live in D7 Postgres.</p>
+        </article>
+        <article class="card" style="--accent:var(--warn)">
+          <h3>Agents need observe + HITL</h3>
+          <p>A4 tools + A4b approve + D8/A3b logs so you can debug 2am failures.</p>
+        </article>
+      </div>
+
+      <footer>
+        Source of truth checklist: <a href="./LEARNING.md">LEARNING.md</a>
+        · Open this file anytime:
+        <code>labs/loglens/PRODUCT_FLOW.html</code>
+      </footer>
+    </div>
+
+    <script>
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "dark",
+        flowchart: { curve: "basis", padding: 10 },
+        themeVariables: {
+          primaryColor: "#141c26",
+          primaryTextColor: "#e8eef6",
+          primaryBorderColor: "#3d9cf0",
+          lineColor: "#8fa0b8",
+          secondaryColor: "#0f1620",
+          tertiaryColor: "#0a0f14",
+          fontFamily: "DM Sans, sans-serif",
+        },
+      });
+    </script>
+  </body>
+</html>

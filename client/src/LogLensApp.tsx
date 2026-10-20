@@ -1,7 +1,5 @@
-"use client";
-
 import { useCallback, useEffect, useState } from "react";
-import type { DiagnoseResponse, Diagnosis } from "@/lib/types";
+import type { DiagnoseResponse, Diagnosis } from "./types";
 
 type FixtureInfo = { id: string; label: string };
 
@@ -61,12 +59,12 @@ export function LogLensApp() {
   return (
     <div className="wrap">
       <header>
-        <div className="badge">Phase A1 · LLM + mock fallback</div>
+        <div className="badge">React client · Node API · A1</div>
         <h1>LogLens</h1>
         <p className="sub">
-          Paste a CI log → <strong>draft</strong> diagnosis. Uses OpenAI when{" "}
-          <code>OPENAI_API_KEY</code> is set; otherwise the A0 mock. Still no auto
-          actions.
+          Separated architecture: this UI (Vite/React) talks to the Express API.
+          Paste a CI log → <strong>draft</strong> diagnosis. OpenAI when keyed;
+          otherwise mock. Still no auto actions.
         </p>
       </header>
 
@@ -188,9 +186,11 @@ export function LogLensApp() {
       </div>
 
       <footer>
-        Health: <a href="/api/health">/api/health</a> · Copy{" "}
-        <code>.env.example</code> → <code>.env.local</code> for a real key · Port{" "}
-        <code>8091</code>
+        UI <code>:5173</code> · API <code>:8091</code> · Health:{" "}
+        <a href="/api/health" target="_blank" rel="noreferrer">
+          /api/health
+        </a>{" "}
+        (proxied) · Key in <code>server/.env</code>
       </footer>
     </div>
   );
