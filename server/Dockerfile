@@ -7,7 +7,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY server/package.json ./server/
 COPY client/package.json ./client/
-RUN npm ci
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && npm ci \
+  && rm -rf /var/lib/apt/lists/*
 
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
@@ -28,7 +31,14 @@ ENV PORT=8091
 COPY package.json package-lock.json ./
 COPY server/package.json ./server/
 COPY client/package.json ./client/
-RUN npm ci --workspace=server --omit=dev && npm cache clean --force
+# better-sqlite3 needs a short native compile on slim images
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && npm ci --workspace=server --omit=dev \
+  && npm cache clean --force \
+  && apt-get purge -y python3 make g++ \
+  && apt-get autoremove -y \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/server/dist ./server/dist
 COPY server/fixtures ./server/fixtures

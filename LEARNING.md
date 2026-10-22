@@ -20,7 +20,7 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 | Track | Done | Next |
 |-------|------|------|
 | AI | A0–A2b, **A3** ✅ (+ Python brain) | A3b observe / A4 agents |
-| DevOps | D0–D3, D6, AUTH, **D4** ✅ | **D10** registry / **D5** PaaS |
+| DevOps | D0–D4, D6, AUTH, **D10** ✅ | **D5** PaaS deploy |
 | Data | **DATA-0** ✅ | D7 Postgres; Redis; real queue |
 | Architecture | SPLIT + **MS** (web/api/ai) ✅ | — |
 | Coverage | BRING listed (not built) | Pull bringables when spine allows |
@@ -46,7 +46,7 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 | 15 | **A3** AI evals | ✅ | Golden fixtures, score + regressions |
 | 16 | **D4** CI (GitHub Actions) | ✅ | test + eval + build on PR |
 | 17 | **BRING** (early) | ☐ | Design tokens, Slack webhook, Insights cost, shadcn |
-| 18 | **D10** Registry + scan | ☐ | GHCR, Trivy/Grype, Dependabot |
+| 18 | **D10** Registry + scan | ✅ | GHCR + Trivy + Dependabot |
 | 19 | **D5** PaaS deploy | ☐ | Public HTTPS URL |
 | 20 | **D9** CD | ☐ | Staging → prod, rollback |
 | 21 | **BRING** (mid) | ☐ | k6 load, Ollama, DuckDB + export ETL |
@@ -276,9 +276,13 @@ Pre-train foundation models, full RLHF research, vision/audio/video products, 10
 - [ ] Rollback; approval gates; feature flags idea  
 - [ ] Blue/green or canary (after basic CD)  
 
-### D10 — Registry + scan
-- [ ] GHCR/ECR, tag = git SHA  
-- [ ] Trivy/Grype/Dependabot  
+### D10 — Registry + scan ✅
+- [x] GHCR push (api / web / ai), tag = git SHA (+ short + `latest` on main)  
+- [x] Trivy scan CRITICAL/HIGH on every PR/build  
+- [x] Dependabot (npm, pip, Actions)  
+**How:** [`.github/workflows/loglens-images.yml`](./.github/workflows/loglens-images.yml), [REGISTRY.md](./REGISTRY.md), [`.github/dependabot.yml`](./.github/dependabot.yml)  
+**PR:** build + scan only. **main / workflow_dispatch:** also push to `ghcr.io/<owner>/loglens-*`  
+
 
 ### D11 — Infra as code (light)
 - [ ] Terraform/Pulumi declare host/DB  
