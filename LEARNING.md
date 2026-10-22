@@ -282,6 +282,7 @@ Pre-train foundation models, full RLHF research, vision/audio/video products, 10
 - [x] Dependabot (npm, pip, Actions)  
 **How:** [`.github/workflows/loglens-images.yml`](./.github/workflows/loglens-images.yml), [REGISTRY.md](./REGISTRY.md), [`.github/dependabot.yml`](./.github/dependabot.yml)  
 **PR:** build + scan only. **main / workflow_dispatch:** also push to `ghcr.io/<owner>/loglens-*`  
+**Verified:** PR Images green; `workflow_dispatch` pushed `loglens-{api,web,ai}` to GHCR.  
 
 
 ### D11 — Infra as code (light)
