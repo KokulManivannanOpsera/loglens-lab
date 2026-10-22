@@ -1,6 +1,7 @@
 # Docker — LogLens (D2 images + D3 compose + D10 registry)
 
-After local compose works, CI can **scan + push** images to GHCR — see [REGISTRY.md](./REGISTRY.md).
+After local compose works, CI can **scan + push** images to GHCR — see [REGISTRY.md](./REGISTRY.md).  
+Public HTTPS host (PaaS) — see [DEPLOY.md](./DEPLOY.md) + [`render.yaml`](./render.yaml).
 
 **Image** = packaged filesystem + metadata (what you `build` / push).  
 **Container** = a running instance of an image (`run`).  

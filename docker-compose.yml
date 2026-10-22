@@ -77,10 +77,10 @@ services:
     ports:
       - "${WEB_PORT:-8088}:80"
     environment:
+      PORT: "80"
       API_UPSTREAM: http://api:8091
     depends_on:
       api:
         condition: service_healthy
-
 volumes:
   loglens-data:

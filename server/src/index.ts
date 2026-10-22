@@ -24,6 +24,9 @@ try {
 const app = express();
 const { port: PORT } = getServerEnvInfo();
 
+// D5 — PaaS terminates TLS; trust X-Forwarded-* so secure cookies / IPs work
+app.set("trust proxy", 1);
+
 app.use(
   cors({
     origin: true,

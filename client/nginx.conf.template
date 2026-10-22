@@ -1,10 +1,10 @@
-# API_UPSTREAM is substituted at container start (nginx image envsubst).
-# D3 compose (service name):       http://api:8091
-# D2 docker run (container name):  http://loglens-api:8091
-# Host API from container:         http://host.docker.internal:8091
+# API_UPSTREAM / PORT substituted at container start (nginx image envsubst).
+# D3 compose:     API_UPSTREAM=http://api:8091  PORT=80
+# D5 PaaS:        API_UPSTREAM=http://loglens-api:10000  PORT=$PORT (host sets)
+# D2 docker run:  API_UPSTREAM=http://loglens-api:8091
 
 server {
-  listen 80;
+  listen ${PORT};
   server_name _;
   root /usr/share/nginx/html;
   index index.html;

@@ -14,7 +14,9 @@ RUN npm run build --workspace=client
 
 FROM nginx:1.27-alpine
 RUN apk upgrade --no-cache
-ENV API_UPSTREAM=http://loglens-api:8091  
+# Compose uses PORT=80; PaaS (Render/Railway) injects PORT (often 10000).
+ENV PORT=80
+ENV API_UPSTREAM=http://loglens-api:8091
 COPY client/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=builder /app/client/dist /usr/share/nginx/html
 EXPOSE 80

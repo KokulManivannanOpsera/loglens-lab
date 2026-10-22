@@ -61,18 +61,30 @@ export async function verifySession(
   }
 }
 
+function cookieSecure(): boolean {
+  // Explicit override wins; otherwise HTTPS cookies in production (D5 PaaS).
+  if (process.env.COOKIE_SECURE === "true") return true;
+  if (process.env.COOKIE_SECURE === "false") return false;
+  return process.env.NODE_ENV === "production";
+}
+
 export function setSessionCookie(res: Response, token: string): void {
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.COOKIE_SECURE === "true",
+    secure: cookieSecure(),
     path: "/",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 }
 
 export function clearSessionCookie(res: Response): void {
-  res.clearCookie(COOKIE_NAME, { path: "/" });
+  res.clearCookie(COOKIE_NAME, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: cookieSecure(),
+  });
 }
 
 export async function requireAuth(

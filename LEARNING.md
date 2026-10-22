@@ -20,7 +20,7 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 | Track | Done | Next |
 |-------|------|------|
 | AI | A0–A2b, **A3** ✅ (+ Python brain) | A3b observe / A4 agents |
-| DevOps | D0–D4, D6, AUTH, **D10** ✅ | **D5** PaaS deploy |
+| DevOps | D0–D4, D6, AUTH, **D10**, **D5** ✅ | **D9** CD (staging→prod) |
 | Data | **DATA-0** ✅ | D7 Postgres; Redis; real queue |
 | Architecture | SPLIT + **MS** (web/api/ai) ✅ | — |
 | Coverage | BRING listed (not built) | Pull bringables when spine allows |
@@ -47,7 +47,7 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 | 16 | **D4** CI (GitHub Actions) | ✅ | test + eval + build on PR |
 | 17 | **BRING** (early) | ☐ | Design tokens, Slack webhook, Insights cost, shadcn |
 | 18 | **D10** Registry + scan | ✅ | GHCR + Trivy + Dependabot |
-| 19 | **D5** PaaS deploy | ☐ | Public HTTPS URL |
+| 19 | **D5** PaaS deploy | ✅ | Public HTTPS URL (Render Blueprint) |
 | 20 | **D9** CD | ☐ | Staging → prod, rollback |
 | 21 | **BRING** (mid) | ☐ | k6 load, Ollama, DuckDB + export ETL |
 | 22 | **A3b** + **D8** Observe | ☐ | Metrics/logs; AI ungrounded rate |
@@ -222,9 +222,14 @@ Pre-train foundation models, full RLHF research, vision/audio/video products, 10
 **You still do:** after first green run, require those checks on `main` (branch protection)  
 
 
-### D5 — Deploy (PaaS cloud)
-- [ ] Public HTTPS URL (Railway/Render/Fly)  
-- [ ] Health check in prod  
+### D5 — Deploy (PaaS cloud) ✅
+- [x] Public HTTPS path via PaaS Blueprint (Render; Railway/Fly alternatives documented)  
+- [x] Health checks in prod config (`healthCheckPath` + `/api/health`)  
+- [x] Prod cookie/`trust proxy` readiness for HTTPS  
+**How:** [`render.yaml`](./render.yaml), [`DEPLOY.md`](./DEPLOY.md)  
+**You still do:** connect the repo in Render → Apply Blueprint → open **loglens-web** URL → `curl …/api/health`  
+**Not yet:** auto promote staging→prod / rollback (**D9**)  
+
 
 ### D6 — Env + secrets ✅
 - [x] Config ≠ code (`server/.env.example` vs `server/.env`)  
