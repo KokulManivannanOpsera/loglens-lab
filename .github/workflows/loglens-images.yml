@@ -77,7 +77,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=loglens-${{ matrix.name }}
 
       - name: Trivy scan (CRITICAL/HIGH)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ steps.meta.outputs.image }}:${{ github.sha }}
           format: table
