@@ -1,0 +1,123 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { after, before, test } from "node:test";
+import { closeDb } from "../src/db/client.js";
+import { cacheClear, cacheGet, cacheSet } from "../src/lib/diagCache.js";
+import {
+  getHistoryDetail,
+  getInsights,
+  hashLog,
+  listHistory,
+  saveDiagnosisRun,
+} from "../src/lib/history.js";
+import type { DiagnoseResponse } from "../src/lib/types.js";
+
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "loglens-history-"));
+const dbFile = path.join(tmpDir, "test.db");
+
+const sample: DiagnoseResponse = {
+  diagnosis: {
+    provider: "mock",
+    summary: "Assertion failed in suite",
+    likelyCause: "AssertionError in unit test",
+    evidence: ["runbook:assertion-failures.md"],
+    nextSteps: ["Re-run the failing test locally"],
+    confidence: "medium",
+    needsHumanReview: true,
+  },
+  meta: {
+    logChars: 120,
+    fixtureHint: "failing-test",
+    mode: "mock",
+    fellBackToMock: false,
+    fallbackReason: null,
+    model: null,
+    latencyMs: 12,
+    truncated: false,
+    truncateStrategy: "none",
+    keptErrorLines: 0,
+    injectionSuspected: false,
+    injectionSignals: [],
+    ragChunkCount: 3,
+    ragHitCount: 1,
+    ragTopScore: 2,
+    ragWeak: false,
+    ragSources: ["assertion-failures.md"],
+    brain: "node-local",
+  },
+};
+
+before(() => {
+  process.env.SQLITE_PATH = dbFile;
+  closeDb();
+  cacheClear();
+});
+
+after(() => {
+  closeDb();
+  cacheClear();
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+  delete process.env.SQLITE_PATH;
+});
+
+test("hashLog is stable", () => {
+  assert.equal(hashLog("abc"), hashLog("abc"));
+  assert.notEqual(hashLog("abc"), hashLog("abd"));
+});
+
+test("save + list + detail + insights", () => {
+  const userId = "user-1";
+  const id = saveDiagnosisRun({
+    userId,
+    logText: "FAIL AssertionError: expected true",
+    fixtureId: "failing-test",
+    response: sample,
+  });
+  assert.ok(id);
+
+  const items = listHistory(userId);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].likelyCause, sample.diagnosis.likelyCause);
+
+  const detail = getHistoryDetail(userId, id);
+  assert.ok(detail);
+  assert.equal(detail.diagnosis.provider, "mock");
+
+  const other = listHistory("other-user");
+  assert.equal(other.length, 0);
+
+  const insights = getInsights(userId);
+  assert.equal(insights.totalRuns, 1);
+  assert.equal(insights.needsReviewCount, 1);
+  assert.ok(insights.byProvider.some((p) => p.provider === "mock"));
+});
+
+test("search finds by cause keyword", () => {
+  const userId = "user-search";
+  saveDiagnosisRun({
+    userId,
+    logText: "timeout waiting for response",
+    response: {
+      ...sample,
+      diagnosis: {
+        ...sample.diagnosis,
+        likelyCause: "HTTP timeout to upstream",
+        summary: "Request hung",
+      },
+    },
+  });
+  const hits = listHistory(userId, { q: "timeout" });
+  assert.ok(hits.length >= 1);
+  assert.match(hits[0].likelyCause, /timeout/i);
+});
+
+test("diagCache round-trip", () => {
+  const runId = "run-x";
+  cacheSet("u", "hash1", runId, sample);
+  const hit = cacheGet("u", "hash1");
+  assert.ok(hit);
+  assert.equal(hit.runId, runId);
+  assert.equal(cacheGet("u", "missing"), null);
+});

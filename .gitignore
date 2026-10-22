@@ -2,10 +2,17 @@ node_modules/
 dist/
 .next/
 out/
-.env
-.env.local
-server/.env
+client/dist/
+data/
 .DS_Store
 *.tsbuildinfo
-data/
-client/dist/
+
+# --- D6 secrets: never commit real env files ---
+.env
+.env.*
+!.env.example
+**/.env
+!**/.env.example
+server/.env
+.env.local
+**/.env.local

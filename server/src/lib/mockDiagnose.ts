@@ -1,4 +1,4 @@
-import type { Diagnosis } from "./types";
+import type { Diagnosis } from "./types.js";
 
 /**
  * A0 mock "model": rule-based, no API key.
@@ -74,7 +74,7 @@ export function mockDiagnose(logText: string): Diagnosis {
     nextSteps: [
       "Add more log context",
       "Try a fixture with a clearer failure",
-      "Later: real LLM + runbook RAG may help",
+      "Check whether runbook retrieval returned useful chunks (A2)",
     ],
     confidence: "low",
     needsHumanReview: true,

@@ -5,7 +5,8 @@
 **Architecture (now):** separated **React client** + **Node (Express) API**.
 
 ```text
-Browser :5173  ──proxy /api──►  Express API :8091  ──►  OpenAI (optional)
+Browser :5173  ──proxy /api──►  Express API :8091  ──►  AI (Python) :8092  ──►  OpenAI (optional)
+                                      auth + fixtures         RAG + diagnose
 ```
 
 ## Run
@@ -14,17 +15,36 @@ Browser :5173  ──proxy /api──►  Express API :8091  ──►  OpenAI (
 cd labs/loglens
 npm install
 
-# terminal 1 — API
-cp server/.env.example server/.env   # optional: add OPENAI_API_KEY
-npm run dev:server
+cp server/.env.example server/.env   # D6: real key only in .env (gitignored)
+# optional: edit server/.env → OPENAI_API_KEY=...
 
-# terminal 2 — UI
-npm run dev:client
+npm run dev   # AI :8092 + API :8091 + UI :5173
 ```
 
-Open **http://localhost:5173** (UI). API health: **http://localhost:8091/api/health**.
+Open **http://localhost:5173** (UI). **Sign up / log in** first — diagnose and fixtures require a session.
 
-Vite proxies `/api/*` from the UI to the API, so `fetch("/api/diagnose")` works without CORS pain in dev.
+- API health: **http://localhost:8091/api/health** (includes `aiService`)
+- AI health: **http://localhost:8092/health**
+
+Vite proxies `/api/*` from the UI to the API (cookies included via `credentials: "include"`).  
+Python AI details: **[ai/README.md](./ai/README.md)**.
+
+Without Python: `npm run dev:node-only` (in-process Node diagnose).
+
+## Docker (D2 + D3 + AI service)
+
+See **[DOCKER.md](./DOCKER.md)**. Short version:
+
+```bash
+docker compose up --build
+# UI  http://localhost:8088
+# API http://localhost:8091/api/health
+# AI  http://localhost:8092/health
+```
+
+## Secrets (D6)
+
+See **[SECRETS.md](./SECRETS.md)**. Short version: key in `server/.env`, never in Git, never in the React client.
 
 ## Tests
 
@@ -42,5 +62,5 @@ npm test
 
 | Track | Next |
 |-------|------|
-| AI | Merge A1 PR if open; then A1b / A1c or D6 |
-| DevOps | D2 Dockerfile (client+server images or one compose) |
+| AI | **A2b** embeddings · Python AI service done |
+| DevOps | D4 CI (GitHub Actions) |

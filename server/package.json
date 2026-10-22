@@ -5,15 +5,25 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "build": "tsc",
     "start": "tsx src/index.ts",
-    "test": "node --import tsx --test tests/diagnose.test.ts"
+    "start:prod": "node dist/index.js",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "eval": "tsx scripts/run-evals.ts"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.11.1",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "jose": "^6.2.13"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^22.18.6",
