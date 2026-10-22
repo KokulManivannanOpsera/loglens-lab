@@ -11,7 +11,10 @@ ENV PORT=8092
 ENV KNOWLEDGE_DIR=/app/knowledge/runbooks
 
 COPY ai/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update \
+  && apt-get upgrade -y \
+  && pip install --no-cache-dir -r requirements.txt \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY ai/app ./app
 # Shared runbooks from the Node package (same corpus as A2)

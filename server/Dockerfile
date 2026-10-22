@@ -31,13 +31,16 @@ ENV PORT=8091
 COPY package.json package-lock.json ./
 COPY server/package.json ./server/
 COPY client/package.json ./client/
-# better-sqlite3 needs a short native compile on slim images
+# better-sqlite3 needs a short native compile on slim images;
+# apt upgrade picks up fixed Debian packages Trivy flags on the base image.
 RUN apt-get update \
+  && apt-get upgrade -y \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && npm ci --workspace=server --omit=dev \
   && npm cache clean --force \
   && apt-get purge -y python3 make g++ \
   && apt-get autoremove -y \
+  && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/server/dist ./server/dist

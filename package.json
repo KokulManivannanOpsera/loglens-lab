@@ -22,5 +22,12 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "overrides": {
+    "brace-expansion": "^2.1.6",
+    "cross-spawn": "^7.0.6",
+    "glob": "^10.5.0",
+    "minimatch": "^9.0.7",
+    "tar": "^7.5.22"
   }
 }
