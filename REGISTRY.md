@@ -36,7 +36,7 @@ echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_USER --password-stdin
 docker pull ghcr.io/YOUR_USER/loglens-api:sha-SHORT
 ```
 
-Compose can later use these tags instead of `build:` (D5/D9).
+**D9 CD** promotes these tags (see [CD.md](./CD.md)). Local: `./scripts/cd-apply-local.sh staging` + [`docker-compose.cd.yml`](./docker-compose.cd.yml).
 
 ## Glossary
 | Term | Meaning |

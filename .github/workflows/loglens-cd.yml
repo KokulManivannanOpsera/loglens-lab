@@ -1,0 +1,320 @@
+# D9 — Continuous Delivery: promote a scanned GHCR SHA → staging / production
+# Does NOT rebuild images (D10 already did). Records release + optional health/hooks.
+name: LogLens CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [staging, production]
+        default: staging
+      action:
+        description: deploy a SHA, or rollback to previous release
+        type: choice
+        options: [deploy, rollback]
+        default: deploy
+      git_sha:
+        description: Full git SHA of GHCR images (empty = this workflow commit)
+        required: false
+        default: ""
+
+  # After Images succeeds on default branch, auto-promote that SHA to staging
+  workflow_run:
+    workflows: ["LogLens Images"]
+    types: [completed]
+    branches: [main, master]
+
+concurrency:
+  group: loglens-cd-${{ github.event.inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  deployments: write
+  packages: read
+  actions: read
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  gate:
+    name: Gate
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.decide.outputs.skip }}
+      environment: ${{ steps.decide.outputs.environment }}
+      action: ${{ steps.decide.outputs.action }}
+      git_sha: ${{ steps.decide.outputs.git_sha }}
+    steps:
+      - name: Decide target
+        id: decide
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "Images did not succeed — skip CD"
+              exit 0
+            fi
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
+            echo "action=deploy" >> "$GITHUB_OUTPUT"
+            echo "git_sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+            echo "action=${{ inputs.action }}" >> "$GITHUB_OUTPUT"
+            SHA="${{ inputs.git_sha }}"
+            if [ -z "$SHA" ]; then SHA="${{ github.sha }}"; fi
+            echo "git_sha=$SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+  deliver:
+    name: Deliver (${{ needs.gate.outputs.environment }})
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    environment: ${{ needs.gate.outputs.environment }}
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Need a token that can push deploy/*.json back to the branch
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve release SHA
+        id: rel
+        env:
+          ACTION: ${{ needs.gate.outputs.action }}
+          ENV_NAME: ${{ needs.gate.outputs.environment }}
+          INPUT_SHA: ${{ needs.gate.outputs.git_sha }}
+        run: |
+          set -euo pipefail
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "owner=$OWNER" >> "$GITHUB_OUTPUT"
+
+          if [ "$ACTION" = "rollback" ]; then
+            PREV="deploy/previous-${ENV_NAME}.json"
+            if [ ! -f "$PREV" ]; then
+              echo "::error::No $PREV — deploy once before rollback"
+              exit 1
+            fi
+            SHA=$(python3 -c "import json; print(json.load(open('$PREV'))['sha'])")
+            echo "Rollback → $SHA"
+          else
+            SHA="$INPUT_SHA"
+          fi
+
+          if [ ${#SHA} -lt 7 ]; then
+            echo "::error::git_sha looks too short: $SHA"
+            exit 1
+          fi
+          SHORT="${SHA:0:7}"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "short=$SHORT" >> "$GITHUB_OUTPUT"
+          echo "api=${{ env.REGISTRY }}/${OWNER}/loglens-api:${SHA}" >> "$GITHUB_OUTPUT"
+          echo "web=${{ env.REGISTRY }}/${OWNER}/loglens-web:${SHA}" >> "$GITHUB_OUTPUT"
+          echo "ai=${{ env.REGISTRY }}/${OWNER}/loglens-ai:${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify GHCR manifests exist
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          for REF in \
+            "${{ steps.rel.outputs.api }}" \
+            "${{ steps.rel.outputs.web }}" \
+            "${{ steps.rel.outputs.ai }}"; do
+            echo "Inspect $REF"
+            docker buildx imagetools inspect "$REF" >/dev/null
+          done
+
+      - name: Create GitHub Deployment
+        id: dep
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const env = '${{ needs.gate.outputs.environment }}';
+            const sha = '${{ steps.rel.outputs.sha }}';
+            const { data: deployment } = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: sha,
+              environment: env,
+              auto_merge: false,
+              required_contexts: [],
+              description: `${{ needs.gate.outputs.action }} LogLens ${sha.slice(0,7)} → ${env}`,
+              payload: {
+                action: '${{ needs.gate.outputs.action }}',
+                images: {
+                  api: '${{ steps.rel.outputs.api }}',
+                  web: '${{ steps.rel.outputs.web }}',
+                  ai: '${{ steps.rel.outputs.ai }}',
+                },
+              },
+            });
+            if (!deployment || !deployment.id) {
+              core.setFailed('Deployment was not created (check environment protection / permissions)');
+              return;
+            }
+            core.setOutput('id', String(deployment.id));
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.id,
+              state: 'in_progress',
+              description: 'Recording release + optional hooks',
+            });
+
+      - name: Write deploy/*.json (GitOps-lite)
+        env:
+          ENV_NAME: ${{ needs.gate.outputs.environment }}
+          ACTION: ${{ needs.gate.outputs.action }}
+          SHA: ${{ steps.rel.outputs.sha }}
+          SHORT: ${{ steps.rel.outputs.short }}
+          API: ${{ steps.rel.outputs.api }}
+          WEB: ${{ steps.rel.outputs.web }}
+          AI: ${{ steps.rel.outputs.ai }}
+        run: |
+          set -euo pipefail
+          mkdir -p deploy
+          TARGET="deploy/${ENV_NAME}.json"
+          PREV="deploy/previous-${ENV_NAME}.json"
+          if [ -f "$TARGET" ] && [ "$ACTION" = "deploy" ]; then
+            cp "$TARGET" "$PREV"
+          fi
+          python3 <<'PY'
+          import json, os, datetime
+          doc = {
+            "environment": os.environ["ENV_NAME"],
+            "action": os.environ["ACTION"],
+            "sha": os.environ["SHA"],
+            "shortSha": os.environ["SHORT"],
+            "images": {
+              "api": os.environ["API"],
+              "web": os.environ["WEB"],
+              "ai": os.environ["AI"],
+            },
+            "deployedAt": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+            "runUrl": os.environ.get("GITHUB_SERVER_URL", "") + "/" + os.environ.get("GITHUB_REPOSITORY", "") + "/actions/runs/" + os.environ.get("GITHUB_RUN_ID", ""),
+            "actor": os.environ.get("GITHUB_ACTOR", ""),
+          }
+          path = f"deploy/{os.environ['ENV_NAME']}.json"
+          with open(path, "w") as f:
+              json.dump(doc, f, indent=2)
+              f.write("\n")
+          print(json.dumps(doc, indent=2))
+          PY
+
+      - name: Commit release record
+        run: |
+          set -euo pipefail
+          git config user.name "loglens-cd[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/*.json
+          if git diff --staged --quiet; then
+            echo "No deploy state change"
+            exit 0
+          fi
+          git commit -m "chore(cd): ${{ needs.gate.outputs.action }} ${{ steps.rel.outputs.short }} → ${{ needs.gate.outputs.environment }} [skip ci]"
+          # Push to the ref that triggered the workflow (branch or the Images head branch)
+          BRANCH="${GITHUB_REF_NAME}"
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            BRANCH="${{ github.event.workflow_run.head_branch }}"
+          fi
+          git push origin "HEAD:refs/heads/${BRANCH}"
+
+      - name: Optional Render deploy hooks
+        env:
+          HOOK_WEB: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+          HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+          HOOK_AI: ${{ secrets.RENDER_DEPLOY_HOOK_AI }}
+        run: |
+          set -euo pipefail
+          hit() {
+            local name="$1" url="$2"
+            if [ -z "$url" ]; then
+              echo "skip $name (secret unset)"
+              return 0
+            fi
+            echo "Trigger $name"
+            curl -fsS -X POST "$url" >/dev/null
+          }
+          hit web "$HOOK_WEB"
+          hit api "$HOOK_API"
+          hit ai "$HOOK_AI"
+
+      - name: Optional smoke health check
+        env:
+          HEALTH_URL: ${{ secrets.HEALTH_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HEALTH_URL:-}" ]; then
+            echo "HEALTH_URL unset — skip smoke (set in Environment secrets)"
+            exit 0
+          fi
+          echo "GET $HEALTH_URL"
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS "$HEALTH_URL" | tee /tmp/health.json; then
+              grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' /tmp/health.json
+              echo "Health OK"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Health check failed"
+          exit 1
+
+      - name: Mark deployment success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: Number('${{ steps.dep.outputs.id }}'),
+              state: 'success',
+              description: 'Recorded ${{ steps.rel.outputs.short }} on ${{ needs.gate.outputs.environment }}',
+              environment_url: process.env.HEALTH_URL || undefined,
+            });
+        env:
+          HEALTH_URL: ${{ secrets.HEALTH_URL }}
+
+      - name: Mark deployment failure
+        if: failure() && steps.dep.outputs.id
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: Number('${{ steps.dep.outputs.id }}'),
+              state: 'failure',
+              description: 'CD failed — see workflow logs',
+            });
+
+      - name: Job summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## LogLens CD — ${{ needs.gate.outputs.action }} → **${{ needs.gate.outputs.environment }}**
+          | | |
+          |--|--|
+          | SHA | \`${{ steps.rel.outputs.sha }}\` |
+          | api | \`${{ steps.rel.outputs.api }}\` |
+          | web | \`${{ steps.rel.outputs.web }}\` |
+          | ai | \`${{ steps.rel.outputs.ai }}\` |
+
+          Local apply: \`./scripts/cd-apply-local.sh ${{ needs.gate.outputs.environment }}\`
+          Rollback: Actions → LogLens CD → **rollback** for this environment.
+          EOF

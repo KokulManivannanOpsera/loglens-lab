@@ -1,0 +1,73 @@
+# D9 — run GHCR images from deploy/<env>.json (no local Dockerfile build)
+# ./scripts/cd-apply-local.sh staging
+
+services:
+  ai:
+    image: ${LOGLENS_AI_IMAGE}
+    pull_policy: always
+    ports:
+      - "8092:8092"
+    environment:
+      PORT: "8092"
+      KNOWLEDGE_DIR: /app/knowledge/runbooks
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      DIAGNOSE_MODE: ${DIAGNOSE_MODE:-auto}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8092/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  api:
+    image: ${LOGLENS_API_IMAGE}
+    pull_policy: always
+    ports:
+      - "8091:8091"
+    environment:
+      PORT: "8091"
+      NODE_ENV: production
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-to-a-long-random-string}
+      AI_SERVICE_URL: http://ai:8092
+      AI_SERVICE_REQUIRED: ${AI_SERVICE_REQUIRED:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DIAGNOSE_MODE: ${DIAGNOSE_MODE:-auto}
+    volumes:
+      - loglens-data:/app/server/data
+    depends_on:
+      ai:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8091/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  web:
+    image: ${LOGLENS_WEB_IMAGE}
+    pull_policy: always
+    ports:
+      - "${WEB_PORT:-8088}:80"
+    environment:
+      PORT: "80"
+      API_UPSTREAM: http://api:8091
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  loglens-data:
