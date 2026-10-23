@@ -1,0 +1,13 @@
+{
+  "environment": "staging",
+  "action": "bootstrap",
+  "sha": null,
+  "shortSha": null,
+  "images": {
+    "api": null,
+    "web": null,
+    "ai": null
+  },
+  "deployedAt": null,
+  "note": "Filled by LogLens CD workflow (D9). Run Actions → LogLens CD → staging."
+}
