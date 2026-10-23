@@ -141,6 +141,7 @@ export async function runDiagnose(opts: {
   logText: string;
   fixtureId?: string | null;
   mode?: string;
+  requestId?: string;
 }): Promise<DiagnoseResponse> {
   const aiUrl = getAiServiceUrl();
   if (aiUrl) {

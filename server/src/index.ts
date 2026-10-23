@@ -9,8 +9,11 @@ import { requireAuth } from "./lib/auth.js";
 import { cacheGet, cacheSet } from "./lib/diagCache.js";
 import { hashLog, saveDiagnosisRun } from "./lib/history.js";
 import { enqueue } from "./lib/jobQueue.js";
+import { log, PROMPT_VERSION } from "./lib/logger.js";
+import { getMetricsSnapshot, observeDiagnose } from "./lib/metrics.js";
 import { runDiagnose } from "./lib/runDiagnose.js";
 import { getServerEnvInfo, isLlmConfigured, redactSecrets } from "./lib/secrets.js";
+import { requestContext } from "./middleware/requestContext.js";
 import { authRouter } from "./routes/auth.js";
 import { historyRouter } from "./routes/history.js";
 
@@ -28,6 +31,8 @@ app.use(
 );
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
+// D8 — requestId + HTTP metrics + JSON access logs
+app.use(requestContext);
 
 app.get("/api/health", async (_req, res) => {
   const aiUrl = getAiServiceUrl();
@@ -43,15 +48,21 @@ app.get("/api/health", async (_req, res) => {
   res.json({
     status: "ok",
     service: "loglens-server",
-    phase: "D7",
+    phase: "D8",
     llmConfigured: isLlmConfigured(),
     auth: "cookie-jwt",
     historyDb,
     db: dbInfo,
+    promptVersion: PROMPT_VERSION,
     aiService: aiUrl
       ? { url: aiUrl, ok: ai?.ok ?? false, detail: ai?.detail ?? null }
       : { configured: false },
   });
+});
+
+/** D8 / A3b — scrape latency, errors, ungrounded (ragWeak) rate */
+app.get("/api/metrics", (_req, res) => {
+  res.json(getMetricsSnapshot());
 });
 
 app.use("/api/auth", authRouter);
@@ -71,6 +82,7 @@ app.get("/api/fixtures/:id", requireAuth, (req, res) => {
 });
 
 app.post("/api/diagnose", requireAuth, async (req, res) => {
+  const requestId = req.requestId ?? "unknown";
   try {
     const { logText, fixtureId, mode } = req.body as {
       logText?: string;
@@ -83,6 +95,21 @@ app.post("/api/diagnose", requireAuth, async (req, res) => {
 
     const cached = text.trim() ? cacheGet(userId, logHash) : null;
     if (cached) {
+      observeDiagnose({
+        ok: true,
+        fromCache: true,
+        latencyMs: 0,
+        ragWeak: cached.response.meta.ragWeak,
+        needsHumanReview: cached.response.diagnosis.needsHumanReview,
+      });
+      log("info", "diagnose", {
+        requestId,
+        runId: cached.runId,
+        fromCache: true,
+        ragWeak: cached.response.meta.ragWeak,
+        provider: cached.response.diagnosis.provider,
+        brain: cached.response.meta.brain,
+      });
       res.json({
         ...cached.response,
         meta: {
@@ -99,6 +126,7 @@ app.post("/api/diagnose", requireAuth, async (req, res) => {
       logText: text,
       fixtureId,
       mode,
+      requestId,
     });
 
     let runId: string | null = null;
@@ -118,32 +146,67 @@ app.post("/api/diagnose", requireAuth, async (req, res) => {
         at: new Date().toISOString(),
       });
     } catch (persistErr) {
-      console.error("history save failed:", persistErr);
+      log("error", "history_save_failed", {
+        requestId,
+        err: persistErr instanceof Error ? persistErr.message : "save failed",
+      });
     }
+
+    observeDiagnose({
+      ok: true,
+      fromCache: false,
+      latencyMs: response.meta.latencyMs,
+      ragWeak: response.meta.ragWeak,
+      needsHumanReview: response.diagnosis.needsHumanReview,
+    });
+    log("info", "diagnose", {
+      requestId,
+      runId,
+      fromCache: false,
+      latencyMs: response.meta.latencyMs,
+      ragWeak: response.meta.ragWeak,
+      needsHumanReview: response.diagnosis.needsHumanReview,
+      provider: response.diagnosis.provider,
+      brain: response.meta.brain,
+      // never log logText / secrets
+      logChars: text.length,
+      fixtureId: fixtureId ?? null,
+    });
 
     res.json({
       ...response,
       meta: { ...response.meta, runId, fromCache: false },
     });
   } catch (err) {
+    observeDiagnose({ ok: false, latencyMs: 0 });
     const message = err instanceof Error ? err.message : "diagnose failed";
+    log("error", "diagnose_failed", { requestId, err: message });
     res.status(502).json({
       error: redactSecrets(message),
       hint: "Set OPENAI_API_KEY in server/.env (see SECRETS.md) or use mode=mock / DIAGNOSE_MODE=auto",
+      requestId,
     });
   }
 });
 
 const boot = await initDb().catch((err) => {
-  console.error("History DB init failed:", err);
+  log("error", "db_init_failed", { err });
   process.exit(1);
 });
 
 app.listen(PORT, () => {
   const info = getServerEnvInfo();
   const aiUrl = getAiServiceUrl();
+  log("info", "api_listen", {
+    port: PORT,
+    llmConfigured: info.llmConfigured,
+    aiService: aiUrl ?? null,
+    dbEngine: boot.engine,
+    promptVersion: PROMPT_VERSION,
+  });
   console.log(`LogLens API  http://127.0.0.1:${PORT}`);
   console.log(`Health       http://127.0.0.1:${PORT}/api/health`);
+  console.log(`Metrics      http://127.0.0.1:${PORT}/api/metrics`);
   console.log(
     `LLM key      ${info.llmConfigured ? "configured (value not printed)" : "not set — mock/auto without key"}`,
   );

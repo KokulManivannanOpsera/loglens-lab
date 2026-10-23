@@ -19,8 +19,8 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 
 | Track | Done | Next |
 |-------|------|------|
-| AI | A0–A2b, **A3** ✅ (+ Python brain) | A3b observe / A4 agents |
-| DevOps | D0–D4, D6, AUTH, **D10**, **D5**, **D9**, **D7** ✅ | D8 observe / A3b |
+| AI | A0–A2b, **A3**, **A3b** ✅ (+ Python brain) | A4 agents |
+| DevOps | D0–D4, D6, AUTH, **D10**, **D5**, **D9**, **D7**, **D8** ✅ | BRING / A4 |
 | Data | **DATA-0**, **D7** ✅ | Redis; real queue |
 | Architecture | SPLIT + **MS** (web/api/ai) ✅ | — |
 | Coverage | BRING listed (not built) | Pull bringables when spine allows |
@@ -50,7 +50,7 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 | 19 | **D5** PaaS deploy | ✅ | Public HTTPS URL (Render Blueprint) |
 | 20 | **D9** CD | ✅ | Staging → prod, rollback |
 | 21 | **BRING** (mid) | ☐ | k6 load, Ollama, DuckDB + export ETL |
-| 22 | **A3b** + **D8** Observe | ☐ | Metrics/logs; AI ungrounded rate |
+| 22 | **A3b** + **D8** Observe | ✅ | Metrics/logs; AI ungrounded rate |
 | 23 | **A4** + **A4b** Agents + safety | ☐ | Tools, allowlists, no auto-write |
 | 24 | **A5** Streaming UX | ☐ | Token stream, cancel |
 | 25 | **A3c** Human feedback | ☐ | Thumbs → eval set |
@@ -147,10 +147,12 @@ AI brain sits inside the app:
 **Trust:** mock mode for deterministic CI; live LLM eval is optional later  
 
 
-### A3b — Observability for AI
-- [ ] Latency, errors, ungrounded rate, token usage  
-- [ ] Prompt **version** id in logs  
-- [ ] No full secrets / unnecessary PII in logs  
+### A3b — Observability for AI ✅
+- [x] Latency, errors, ungrounded rate (`ragWeak`) on `/api/metrics`  
+- [x] Prompt **version** id in logs (`PROMPT_VERSION`)  
+- [x] No full secrets / log bodies in logs (redact + logChars only)  
+**How:** [`OBSERVE.md`](./OBSERVE.md), `server/src/lib/metrics.ts`, `logger.ts`  
+
 
 ### A3c — Human feedback loop
 - [ ] Thumbs up/down on diagnosis  
@@ -276,8 +278,13 @@ Pre-train foundation models, full RLHF research, vision/audio/video products, 10
 **How:** [`DATABASE.md`](./DATABASE.md), `server/src/db/postgres.ts`, `migrations/postgres/`, `docker compose --profile postgres`  
 
 
-### D8 — Observability (platform)
-- [ ] Logs, metrics, traces idea, alerts, runbook  
+### D8 — Observability (platform) ✅
+- [x] Structured JSON logs + HTTP metrics middleware  
+- [x] `GET /api/metrics`; AI `GET /metrics`; `X-Request-Id` api→ai  
+- [x] Trace *idea* via shared requestId/runId (full OTel later)  
+- [x] Alerts/runbook: Slack BRING + health (Sentry optional later)  
+**How:** [`OBSERVE.md`](./OBSERVE.md), `middleware/requestContext.ts`, `ai/app/observe.py`  
+
 
 ### D9 — CD ✅
 - [x] Delivery vs deployment (CI/Images vs promote SHA)  

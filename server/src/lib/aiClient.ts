@@ -16,17 +16,27 @@ export function isAiServiceRequired(): boolean {
  */
 export async function diagnoseViaAiService(
   baseUrl: string,
-  opts: { logText: string; fixtureId?: string | null; mode?: string },
+  opts: {
+    logText: string;
+    fixtureId?: string | null;
+    mode?: string;
+    requestId?: string;
+  },
 ): Promise<DiagnoseResponse> {
   const timeoutMs = Number(process.env.AI_SERVICE_TIMEOUT_MS || 60_000);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (opts.requestId) headers["X-Request-Id"] = opts.requestId;
+
     const res = await fetch(`${baseUrl}/v1/diagnose`, {
       method: "POST",
       signal: controller.signal,
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         logText: opts.logText,
         fixtureId: opts.fixtureId ?? null,
