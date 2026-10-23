@@ -140,7 +140,7 @@ jobs:
 
       - name: Create GitHub Deployment
         id: dep
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const env = '${{ needs.gate.outputs.environment }}';
@@ -276,7 +276,7 @@ jobs:
 
       - name: Mark deployment success
         if: success()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.repos.createDeploymentStatus({
@@ -292,7 +292,7 @@ jobs:
 
       - name: Mark deployment failure
         if: failure() && steps.dep.outputs.id
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.repos.createDeploymentStatus({
