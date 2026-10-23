@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import time
 
+from .agent import enrich_evidence_from_agent, run_agent
 from .config import settings
 from .llm import openai_diagnose
 from .mock_diagnose import mock_diagnose
@@ -136,6 +137,10 @@ async def run_diagnose(
     diagnosis = ground_with_rag(diagnosis, rag)
     diagnosis = enforce_hitl(diagnosis, suspected)
 
+    # A4 — tool loop (read tools + write drafts pending approval)
+    agent = await run_agent(text, knowledge_dir=settings.knowledge_dir)
+    diagnosis = enrich_evidence_from_agent(diagnosis, agent)
+
     return {
         "diagnosis": diagnosis,
         "meta": {
@@ -160,5 +165,6 @@ async def run_diagnose(
             "ragEmbeddingProvider": rag.embedding_provider,
             "ragEmbeddingModel": rag.embedding_model,
             "brain": "python",
+            "agent": agent,
         },
     }

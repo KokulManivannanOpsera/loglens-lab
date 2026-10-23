@@ -482,6 +482,37 @@ function DiagnosisView({
   diagnosis: Diagnosis;
   meta: DiagnoseResponse["meta"] | null;
 }) {
+  const [approveMsg, setApproveMsg] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+
+  async function onApprove(
+    toolCallId: string,
+    approved: boolean,
+    draft: Record<string, unknown>,
+  ) {
+    setApprovingId(toolCallId);
+    setApproveMsg(null);
+    try {
+      const res = await fetch("/api/agent/approve", {
+        method: "POST",
+        ...jsonCred,
+        body: JSON.stringify({ toolCallId, approved, draft }),
+      });
+      const data = (await res.json()) as { message?: string; error?: string };
+      if (!res.ok) {
+        setApproveMsg(data.error || "Approve failed");
+        return;
+      }
+      setApproveMsg(data.message || (approved ? "Approved" : "Rejected"));
+    } catch {
+      setApproveMsg("Network error on approve");
+    } finally {
+      setApprovingId(null);
+    }
+  }
+
+  const agent = meta?.agent;
+
   return (
     <dl className="diag">
       <dt>Provider</dt>
@@ -580,6 +611,83 @@ function DiagnosisView({
           </dd>
         </>
       )}
+      {agent?.enabled && (
+        <>
+          <dt>Agent</dt>
+          <dd>
+            <span className="pill">max {agent.maxSteps} steps</span>{" "}
+            {agent.shadowMode && <span className="pill">shadow</span>}
+            {agent.refusedSignals?.length > 0 && (
+              <>
+                {" "}
+                <span className="pill review">
+                  refused: {agent.refusedSignals.join(", ")}
+                </span>
+              </>
+            )}
+            <p className="empty" style={{ margin: "0.4rem 0 0" }}>
+              {agent.note}
+            </p>
+            <ol className="agent-trail">
+              {agent.toolCalls.map((c) => (
+                <li key={c.id}>
+                  <code>
+                    #{c.step} {c.tool}
+                  </code>{" "}
+                  <span className="pill">{c.sideEffect}</span>
+                  {c.reason ? ` — ${c.reason}` : ""}
+                  {c.tool === "grep_log" &&
+                  Array.isArray(c.result.hits) &&
+                  (c.result.hits as string[]).length > 0 ? (
+                    <div className="empty">
+                      hits: {(c.result.hits as string[]).slice(0, 2).join(" · ")}
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </dd>
+        </>
+      )}
+      {agent?.pendingApprovals?.length ? (
+        <>
+          <dt>Write tools</dt>
+          <dd>
+            {agent.pendingApprovals.map((p) => (
+              <div key={p.id} className="agent-approve">
+                <div>
+                  <span className="pill review">{p.status}</span>{" "}
+                  <code>{p.tool}</code>
+                </div>
+                <pre className="agent-draft">
+                  {String(p.draft?.title || "")}
+                  {"\n\n"}
+                  {String(p.draft?.body || "").slice(0, 400)}
+                </pre>
+                <div className="agent-actions">
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={approvingId === p.id}
+                    onClick={() => void onApprove(p.id, true, p.draft)}
+                  >
+                    Approve (shadow)
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost"
+                    disabled={approvingId === p.id}
+                    onClick={() => void onApprove(p.id, false, p.draft)}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+            {approveMsg && <p className="empty">{approveMsg}</p>}
+          </dd>
+        </>
+      ) : null}
       <dt>Summary</dt>
       <dd>{diagnosis.summary}</dd>
       <dt>Likely cause</dt>

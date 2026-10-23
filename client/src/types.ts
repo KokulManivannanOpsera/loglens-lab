@@ -38,6 +38,30 @@ export type DiagnoseResponse = {
     brain?: "python" | "node-local";
     runId?: string | null;
     fromCache?: boolean;
+    /** A4 — tool trail + pending write approvals */
+    agent?: {
+      enabled: boolean;
+      maxSteps: number;
+      allowlist: string[];
+      refusedSignals: string[];
+      toolCalls: {
+        id: string;
+        step: number;
+        tool: string;
+        args: Record<string, unknown>;
+        reason?: string;
+        sideEffect: "read" | "write";
+        result: Record<string, unknown>;
+      }[];
+      pendingApprovals: {
+        id: string;
+        tool: string;
+        draft: Record<string, unknown>;
+        status: string;
+      }[];
+      shadowMode: boolean;
+      note: string;
+    };
   };
 };
 

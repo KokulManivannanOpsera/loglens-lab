@@ -48,5 +48,29 @@ export type DiagnoseResponse = {
     runId?: string | null;
     /** DATA-0: served from in-process log-hash cache */
     fromCache?: boolean;
+    /** A4 — tool-using agent trail + pending write approvals */
+    agent?: {
+      enabled: boolean;
+      maxSteps: number;
+      allowlist: string[];
+      refusedSignals: string[];
+      toolCalls: {
+        id: string;
+        step: number;
+        tool: string;
+        args: Record<string, unknown>;
+        reason?: string;
+        sideEffect: "read" | "write";
+        result: Record<string, unknown>;
+      }[];
+      pendingApprovals: {
+        id: string;
+        tool: string;
+        draft: Record<string, unknown>;
+        status: string;
+      }[];
+      shadowMode: boolean;
+      note: string;
+    };
   };
 };

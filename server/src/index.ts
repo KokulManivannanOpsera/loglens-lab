@@ -14,6 +14,7 @@ import { getMetricsSnapshot, observeDiagnose } from "./lib/metrics.js";
 import { runDiagnose } from "./lib/runDiagnose.js";
 import { getServerEnvInfo, isLlmConfigured, redactSecrets } from "./lib/secrets.js";
 import { requestContext } from "./middleware/requestContext.js";
+import { agentRouter } from "./routes/agent.js";
 import { authRouter } from "./routes/auth.js";
 import { historyRouter } from "./routes/history.js";
 
@@ -48,7 +49,7 @@ app.get("/api/health", async (_req, res) => {
   res.json({
     status: "ok",
     service: "loglens-server",
-    phase: "D8",
+    phase: "A4",
     llmConfigured: isLlmConfigured(),
     auth: "cookie-jwt",
     historyDb,
@@ -67,6 +68,7 @@ app.get("/api/metrics", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/history", historyRouter);
+app.use("/api/agent", agentRouter);
 
 app.get("/api/fixtures", requireAuth, (_req, res) => {
   res.json(listFixtures());

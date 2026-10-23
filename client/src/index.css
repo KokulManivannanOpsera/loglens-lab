@@ -245,6 +245,44 @@ button.ghost.small {
   font-size: 0.75rem;
 }
 
+.agent-trail {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+}
+
+.agent-trail li {
+  margin-bottom: 0.35rem;
+}
+
+.agent-approve {
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.agent-approve:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.agent-draft {
+  margin: 0.45rem 0;
+  padding: 0.55rem 0.7rem;
+  background: var(--code);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  max-height: 10rem;
+  overflow: auto;
+}
+
+.agent-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .auth-wrap {
   max-width: 480px;
 }

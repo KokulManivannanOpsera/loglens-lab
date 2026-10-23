@@ -57,10 +57,11 @@ npm test
 ## Learning
 
 - Tracker: [LEARNING.md](./LEARNING.md)
+- Agents: [AGENTS.md](./AGENTS.md)
 - Flow diagram: [PRODUCT_FLOW.html](./PRODUCT_FLOW.html)
 - Git/PR: [GIT_PR.md](./GIT_PR.md)
 
 | Track | Next |
 |-------|------|
-| AI | **A2b** embeddings · Python AI service done |
-| DevOps | D4 CI (GitHub Actions) |
+| AI | **A5** streaming UX |
+| DevOps | BRING / D11 IaC |

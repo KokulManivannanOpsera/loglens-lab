@@ -7,7 +7,7 @@
       "causeIncludes": ["assertion"],
       "mustCiteRunbook": ["assertion-failures"],
       "ragWeak": false,
-      "needsHumanReview": false,
+      "needsHumanReview": true,
       "provider": "mock"
     }
   },

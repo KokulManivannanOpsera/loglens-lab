@@ -3,6 +3,7 @@ import {
   getAiServiceUrl,
   isAiServiceRequired,
 } from "./aiClient.js";
+import { enrichDiagnosisWithAgent, runNodeAgent } from "./agent.js";
 import { mockDiagnose } from "./mockDiagnose.js";
 import { openaiDiagnose } from "./llmDiagnose.js";
 import { enforceHitlPolicy, scanForInjection } from "./promptGuard.js";
@@ -73,63 +74,55 @@ async function runDiagnoseLocal(opts: {
   const hasKey = isLlmConfigured();
   const useMock = mode === "mock" || (mode === "auto" && !hasKey);
 
-  if (useMock) {
-    const diagnosis = finalizeDiagnosis(
-      mockDiagnose(text),
-      truncated,
-      injection,
-      rag,
-    );
-    return {
-      diagnosis,
-      meta: {
-        ...baseMeta,
-        fellBackToMock: false,
-        fallbackReason: truncated ? `log truncated (${strategy})` : null,
-        model: null,
-        latencyMs: Date.now() - started,
-      },
-    };
-  }
+  let diagnosis: Diagnosis;
+  let fellBackToMock = false;
+  let fallbackReason: string | null = truncated
+    ? `log truncated (${strategy})`
+    : null;
+  let model: string | null = null;
 
-  try {
-    const { diagnosis, model } = await openaiDiagnose(text, rag.hits);
-    return {
-      diagnosis: finalizeDiagnosis(diagnosis, truncated, injection, rag),
-      meta: {
-        ...baseMeta,
-        fellBackToMock: false,
-        fallbackReason: truncated ? `log truncated (${strategy})` : null,
-        model,
-        latencyMs: Date.now() - started,
-      },
-    };
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : "llm error";
-    if (mode === "openai") {
-      throw err;
-    }
-    const diagnosis = finalizeDiagnosis(
-      mockDiagnose(text),
-      truncated,
-      injection,
-      rag,
-    );
-    return {
-      diagnosis: {
+  if (useMock) {
+    diagnosis = finalizeDiagnosis(mockDiagnose(text), truncated, injection, rag);
+  } else {
+    try {
+      const out = await openaiDiagnose(text, rag.hits);
+      diagnosis = finalizeDiagnosis(out.diagnosis, truncated, injection, rag);
+      model = out.model;
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "llm error";
+      if (mode === "openai") {
+        throw err;
+      }
+      fellBackToMock = true;
+      fallbackReason = reason;
+      diagnosis = finalizeDiagnosis(
+        mockDiagnose(text),
+        truncated,
+        injection,
+        rag,
+      );
+      diagnosis = {
         ...diagnosis,
         summary: `${diagnosis.summary} [fell back to mock: ${reason}]`,
         needsHumanReview: true,
-      },
-      meta: {
-        ...baseMeta,
-        fellBackToMock: true,
-        fallbackReason: reason,
-        model: null,
-        latencyMs: Date.now() - started,
-      },
-    };
+      };
+    }
   }
+
+  const agent = await runNodeAgent(text);
+  diagnosis = enrichDiagnosisWithAgent(diagnosis, agent);
+
+  return {
+    diagnosis,
+    meta: {
+      ...baseMeta,
+      fellBackToMock,
+      fallbackReason,
+      model,
+      latencyMs: Date.now() - started,
+      agent,
+    },
+  };
 }
 
 /**

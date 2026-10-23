@@ -19,8 +19,8 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 
 | Track | Done | Next |
 |-------|------|------|
-| AI | A0–A2b, **A3**, **A3b** ✅ (+ Python brain) | A4 agents |
-| DevOps | D0–D4, D6, AUTH, **D10**, **D5**, **D9**, **D7**, **D8** ✅ | BRING / A4 |
+| AI | A0–A2b, **A3**, **A3b**, **A4/A4b** ✅ (+ Python brain) | A5 streaming |
+| DevOps | D0–D4, D6, AUTH, **D10**, **D5**, **D9**, **D7**, **D8** ✅ | BRING / A5 |
 | Data | **DATA-0**, **D7** ✅ | Redis; real queue |
 | Architecture | SPLIT + **MS** (web/api/ai) ✅ | — |
 | Coverage | BRING listed (not built) | Pull bringables when spine allows |
@@ -51,7 +51,7 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 | 20 | **D9** CD | ✅ | Staging → prod, rollback |
 | 21 | **BRING** (mid) | ☐ | k6 load, Ollama, DuckDB + export ETL |
 | 22 | **A3b** + **D8** Observe | ✅ | Metrics/logs; AI ungrounded rate |
-| 23 | **A4** + **A4b** Agents + safety | ☐ | Tools, allowlists, no auto-write |
+| 23 | **A4** + **A4b** Agents + safety | ✅ | Tools, allowlists, no auto-write |
 | 24 | **A5** Streaming UX | ☐ | Token stream, cancel |
 | 25 | **A3c** Human feedback | ☐ | Thumbs → eval set |
 | 26 | **D7** Managed Postgres | ✅ | Swap SQLite schema → Postgres |
@@ -158,16 +158,17 @@ AI brain sits inside the app:
 - [ ] Thumbs up/down on diagnosis  
 - [ ] Feed misses back into eval set  
 
-### A4 — Tools + light agent
-- [ ] Tool calling (search runbook, grep log)  
-- [ ] Observe → act loop, max steps  
-- [ ] Approve before any write tool  
+### A4 — Tools + light agent ✅
+- [x] Tool calling (search runbook, grep log)  
+- [x] Observe → act loop, max steps (3)  
+- [x] Approve before any write tool  
 
-### A4b — Agent safety + guardrails
-- [ ] Allowlists, dry-run / shadow mode  
-- [ ] Audit trail of tool calls  
-- [ ] Blast radius; refuse “auto-fix prod”  
-- [ ] PII / unsafe-action guardrails  
+### A4b — Agent safety + guardrails ✅
+- [x] Allowlists, dry-run / shadow mode  
+- [x] Audit trail of tool calls  
+- [x] Blast radius; refuse “auto-fix prod” / destructive / skip-CI  
+- [x] Unsafe-action guardrails (pattern refuse; PII polish later)  
+**How:** [`AGENTS.md`](./AGENTS.md), `ai/app/agent.py`, `server/src/lib/agent.ts`
 
 ### A5 — Streaming UX
 - [ ] Token stream to UI  
@@ -478,3 +479,8 @@ Developer → PR → CI (lint/test/eval/build/scan)
 - date: 2026-10-22
 - what built: FastAPI `ai/` service; Express `AI_SERVICE_URL` client; compose `ai`+`api`+`web`
 - prove aloud: auth stays on api; brain is a separate process; compose DNS `ai:8092`; fallback to node-local if AI down
+
+### A4 / A4b
+- date: 2026-10-23
+- what built: allowlisted tool agent (grep_log, search_runbook, create_ticket_draft); max 3 steps; write = pending + shadow approve API/UI; refuse destructive/auto-prod/skip-CI; Python + Node mirror; AGENTS.md
+- prove aloud: tool trail on diagnose; Approve records audit with executed=false; unsafe log → refusedSignals and no ticket draft
