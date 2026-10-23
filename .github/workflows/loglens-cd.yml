@@ -81,7 +81,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Need a token that can push deploy/*.json back to the branch
           token: ${{ secrets.GITHUB_TOKEN }}
