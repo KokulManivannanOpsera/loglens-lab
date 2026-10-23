@@ -2,7 +2,7 @@ import "./lib/secrets.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
-import { getDb, getDbPath } from "./db/client.js";
+import { getDbInfo, initDb } from "./db/client.js";
 import { aiServiceHealth, getAiServiceUrl } from "./lib/aiClient.js";
 import { listFixtures, readFixture } from "./lib/fixtures.js";
 import { requireAuth } from "./lib/auth.js";
@@ -13,13 +13,6 @@ import { runDiagnose } from "./lib/runDiagnose.js";
 import { getServerEnvInfo, isLlmConfigured, redactSecrets } from "./lib/secrets.js";
 import { authRouter } from "./routes/auth.js";
 import { historyRouter } from "./routes/history.js";
-
-// Open SQLite + migrations at boot (DATA-0)
-try {
-  getDb();
-} catch (err) {
-  console.error("SQLite init failed:", err);
-}
 
 const app = express();
 const { port: PORT } = getServerEnvInfo();
@@ -39,9 +32,10 @@ app.use(cookieParser());
 app.get("/api/health", async (_req, res) => {
   const aiUrl = getAiServiceUrl();
   const ai = aiUrl ? await aiServiceHealth(aiUrl) : null;
+  const dbInfo = getDbInfo();
   let historyDb = false;
   try {
-    getDb();
+    await initDb();
     historyDb = true;
   } catch {
     historyDb = false;
@@ -49,10 +43,11 @@ app.get("/api/health", async (_req, res) => {
   res.json({
     status: "ok",
     service: "loglens-server",
-    phase: "DATA-0",
+    phase: "D7",
     llmConfigured: isLlmConfigured(),
     auth: "cookie-jwt",
     historyDb,
+    db: dbInfo,
     aiService: aiUrl
       ? { url: aiUrl, ok: ai?.ok ?? false, detail: ai?.detail ?? null }
       : { configured: false },
@@ -108,7 +103,7 @@ app.post("/api/diagnose", requireAuth, async (req, res) => {
 
     let runId: string | null = null;
     try {
-      runId = saveDiagnosisRun({
+      runId = await saveDiagnosisRun({
         userId,
         logText: text,
         fixtureId,
@@ -139,6 +134,11 @@ app.post("/api/diagnose", requireAuth, async (req, res) => {
   }
 });
 
+const boot = await initDb().catch((err) => {
+  console.error("History DB init failed:", err);
+  process.exit(1);
+});
+
 app.listen(PORT, () => {
   const info = getServerEnvInfo();
   const aiUrl = getAiServiceUrl();
@@ -151,5 +151,5 @@ app.listen(PORT, () => {
     `AI brain     ${aiUrl ? aiUrl : "in-process node-local (set AI_SERVICE_URL for Python)"}`,
   );
   console.log("Auth         signup/login cookie session (diagnose requires login)");
-  console.log(`History DB   ${getDbPath()}`);
+  console.log(`History DB   ${boot.engine} · ${boot.label}`);
 });

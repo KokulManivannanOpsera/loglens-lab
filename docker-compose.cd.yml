@@ -39,6 +39,7 @@ services:
       AI_SERVICE_REQUIRED: ${AI_SERVICE_REQUIRED:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       DIAGNOSE_MODE: ${DIAGNOSE_MODE:-auto}
+      DATABASE_URL: ${DATABASE_URL:-}
     volumes:
       - loglens-data:/app/server/data
     depends_on:

@@ -20,8 +20,8 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 | Track | Done | Next |
 |-------|------|------|
 | AI | A0–A2b, **A3** ✅ (+ Python brain) | A3b observe / A4 agents |
-| DevOps | D0–D4, D6, AUTH, **D10**, **D5**, **D9** ✅ | D7 Postgres / D8 observe |
-| Data | **DATA-0** ✅ | D7 Postgres; Redis; real queue |
+| DevOps | D0–D4, D6, AUTH, **D10**, **D5**, **D9**, **D7** ✅ | D8 observe / A3b |
+| Data | **DATA-0**, **D7** ✅ | Redis; real queue |
 | Architecture | SPLIT + **MS** (web/api/ai) ✅ | — |
 | Coverage | BRING listed (not built) | Pull bringables when spine allows |
 
@@ -54,7 +54,7 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 | 23 | **A4** + **A4b** Agents + safety | ☐ | Tools, allowlists, no auto-write |
 | 24 | **A5** Streaming UX | ☐ | Token stream, cancel |
 | 25 | **A3c** Human feedback | ☐ | Thumbs → eval set |
-| 26 | **D7** Managed Postgres | ☐ | Swap SQLite schema → Postgres |
+| 26 | **D7** Managed Postgres | ✅ | Swap SQLite schema → Postgres |
 | 27 | **BRING** (security) | ☐ | ZAP baseline (after D5), Checkov (with D11) |
 | 28 | **D11** IaC light | ☐ | Terraform/Pulumi |
 | 29 | **D12** Kubernetes | ☐ | kind/minikube → manifests |
@@ -266,11 +266,15 @@ Pre-train foundation models, full RLHF research, vision/audio/video products, 10
 - [x] Same-log cache skips repeat LLM within TTL  
 - [x] UI tabs: Diagnose · History · Insights  
 **How:** `server/src/db/*`, `lib/history.ts`, `lib/diagCache.ts`, `lib/jobQueue.ts`, `routes/history.ts`; client tabs in `LogLensApp.tsx`  
-**Not yet:** managed Postgres (D7), Redis, real message broker, Snowflake/dbt  
+**Not yet:** Redis, real message broker, Snowflake/dbt  
 
-### D7 — Managed Postgres
-- [ ] Swap/dual `DATABASE_URL` (same schema as DATA-0)  
-- [ ] Connection string, migrations, backups idea  
+### D7 — Managed Postgres ✅
+- [x] Dual store: unset `DATABASE_URL` → SQLite; set → Postgres (`pg`)  
+- [x] Same History/Insights API; PG migrations + tsvector search  
+- [x] Compose profile `postgres`; CI service container for `history-pg` tests  
+- [x] Backups idea documented (provider PITR / snapshots)  
+**How:** [`DATABASE.md`](./DATABASE.md), `server/src/db/postgres.ts`, `migrations/postgres/`, `docker compose --profile postgres`  
+
 
 ### D8 — Observability (platform)
 - [ ] Logs, metrics, traces idea, alerts, runbook  

@@ -53,6 +53,44 @@ jobs:
       - name: Build server + client
         run: npm run build
 
+  node-postgres:
+    name: Node — postgres history
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: loglens
+          POSTGRES_PASSWORD: loglens
+          POSTGRES_DB: loglens
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U loglens -d loglens"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: History tests against Postgres
+        working-directory: server
+        run: node --import tsx --test tests/history-pg.test.ts
+        env:
+          DATABASE_URL: postgres://loglens:loglens@localhost:5432/loglens
+
   python-ai:
     name: Python AI — pytest
     runs-on: ubuntu-latest

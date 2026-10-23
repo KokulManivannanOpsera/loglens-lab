@@ -8,6 +8,27 @@
 # Optional: copy .env.example → .env
 
 services:
+  # D7 — optional managed DB locally: docker compose --profile postgres up --build
+  # Requires DATABASE_URL=postgres://loglens:loglens@db:5432/loglens in .env
+  db:
+    profiles: ["postgres"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: loglens
+      POSTGRES_PASSWORD: loglens
+      POSTGRES_DB: loglens
+    ports:
+      # Host 5433 avoids clashing with a local Postgres on 5432
+      - "5433:5432"
+    volumes:
+      - loglens-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loglens -d loglens"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   ai:
     build:
       context: .
@@ -51,6 +72,8 @@ services:
       # LLM key still useful if AI falls back to node-local, or for ai service via its own env
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       DIAGNOSE_MODE: ${DIAGNOSE_MODE:-auto}
+      # D7 — empty = SQLite file; set to use Postgres (compose profile postgres)
+      DATABASE_URL: ${DATABASE_URL:-}
     volumes:
       - loglens-data:/app/server/data
     depends_on:
@@ -84,3 +107,4 @@ services:
         condition: service_healthy
 volumes:
   loglens-data:
+  loglens-pg:

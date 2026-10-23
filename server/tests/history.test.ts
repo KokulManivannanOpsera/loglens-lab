@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
-import { closeDb } from "../src/db/client.js";
+import { closeDb, initDb } from "../src/db/client.js";
 import { cacheClear, cacheGet, cacheSet } from "../src/lib/diagCache.js";
 import {
   getHistoryDetail,
@@ -49,14 +49,16 @@ const sample: DiagnoseResponse = {
   },
 };
 
-before(() => {
+before(async () => {
+  delete process.env.DATABASE_URL;
   process.env.SQLITE_PATH = dbFile;
-  closeDb();
+  await closeDb();
+  await initDb();
   cacheClear();
 });
 
-after(() => {
-  closeDb();
+after(async () => {
+  await closeDb();
   cacheClear();
   fs.rmSync(tmpDir, { recursive: true, force: true });
   delete process.env.SQLITE_PATH;
@@ -67,9 +69,9 @@ test("hashLog is stable", () => {
   assert.notEqual(hashLog("abc"), hashLog("abd"));
 });
 
-test("save + list + detail + insights", () => {
+test("save + list + detail + insights", async () => {
   const userId = "user-1";
-  const id = saveDiagnosisRun({
+  const id = await saveDiagnosisRun({
     userId,
     logText: "FAIL AssertionError: expected true",
     fixtureId: "failing-test",
@@ -77,26 +79,26 @@ test("save + list + detail + insights", () => {
   });
   assert.ok(id);
 
-  const items = listHistory(userId);
+  const items = await listHistory(userId);
   assert.equal(items.length, 1);
   assert.equal(items[0].likelyCause, sample.diagnosis.likelyCause);
 
-  const detail = getHistoryDetail(userId, id);
+  const detail = await getHistoryDetail(userId, id);
   assert.ok(detail);
   assert.equal(detail.diagnosis.provider, "mock");
 
-  const other = listHistory("other-user");
+  const other = await listHistory("other-user");
   assert.equal(other.length, 0);
 
-  const insights = getInsights(userId);
+  const insights = await getInsights(userId);
   assert.equal(insights.totalRuns, 1);
   assert.equal(insights.needsReviewCount, 1);
   assert.ok(insights.byProvider.some((p) => p.provider === "mock"));
 });
 
-test("search finds by cause keyword", () => {
+test("search finds by cause keyword", async () => {
   const userId = "user-search";
-  saveDiagnosisRun({
+  await saveDiagnosisRun({
     userId,
     logText: "timeout waiting for response",
     response: {
@@ -108,7 +110,7 @@ test("search finds by cause keyword", () => {
       },
     },
   });
-  const hits = listHistory(userId, { q: "timeout" });
+  const hits = await listHistory(userId, { q: "timeout" });
   assert.ok(hits.length >= 1);
   assert.match(hits[0].likelyCause, /timeout/i);
 });
