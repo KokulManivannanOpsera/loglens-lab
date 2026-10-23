@@ -21,7 +21,7 @@
     "docker:down": "docker compose down"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^10.0.6"
   },
   "overrides": {
     "brace-expansion": "^2.1.6",
