@@ -94,6 +94,10 @@ test("save + list + detail + insights", async () => {
   assert.equal(insights.totalRuns, 1);
   assert.equal(insights.needsReviewCount, 1);
   assert.ok(insights.byProvider.some((p) => p.provider === "mock"));
+  assert.ok(insights.costEstimate);
+  assert.equal(insights.costEstimate.mockRuns, 1);
+  assert.equal(insights.costEstimate.openaiRuns, 0);
+  assert.equal(insights.costEstimate.estimatedUsd, 0);
 });
 
 test("search finds by cause keyword", async () => {

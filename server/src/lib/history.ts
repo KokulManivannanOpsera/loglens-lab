@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "crypto";
 import { getSqliteDb, usePostgres } from "../db/client.js";
 import { getPool } from "../db/postgres.js";
+import { estimateDiagnoseCost, type CostEstimate } from "./costEstimate.js";
+import { getFeedback, type FeedbackRecord } from "./feedback.js";
 import type { DiagnoseResponse, Diagnosis } from "./types.js";
 
 export type HistoryListItem = {
@@ -21,6 +23,8 @@ export type HistoryDetail = HistoryListItem & {
   logHash: string;
   diagnosis: Diagnosis;
   meta: DiagnoseResponse["meta"];
+  /** A3c — latest thumbs for this run (if any) */
+  feedback?: FeedbackRecord | null;
 };
 
 export type Insights = {
@@ -32,6 +36,8 @@ export type Insights = {
   byBrain: { brain: string; count: number }[];
   byConfidence: { confidence: string; count: number }[];
   topCauses: { cause: string; count: number }[];
+  /** BRING — FinOps-lite LLM $ proxy */
+  costEstimate: CostEstimate;
 };
 
 export function hashLog(logText: string): string {
@@ -295,11 +301,13 @@ export async function getHistoryDetail(
     );
     const row = res.rows[0] as Record<string, unknown> | undefined;
     if (!row) return null;
+    const feedback = await getFeedback(userId, id);
     return {
       ...rowToListItem(row),
       logHash: String(row.log_hash),
       diagnosis: JSON.parse(String(row.diagnosis_json)) as Diagnosis,
       meta: JSON.parse(String(row.meta_json)) as DiagnoseResponse["meta"],
+      feedback,
     };
   }
 
@@ -307,11 +315,13 @@ export async function getHistoryDetail(
     .prepare(`SELECT * FROM diagnosis_runs WHERE id = ? AND user_id = ?`)
     .get(id, userId) as Record<string, unknown> | undefined;
   if (!row) return null;
+  const feedback = await getFeedback(userId, id);
   return {
     ...rowToListItem(row),
     logHash: String(row.log_hash),
     diagnosis: JSON.parse(String(row.diagnosis_json)) as Diagnosis,
     meta: JSON.parse(String(row.meta_json)) as DiagnoseResponse["meta"],
+    feedback,
   };
 }
 
@@ -402,6 +412,7 @@ function getInsightsSqlite(userId: string): Insights {
     byBrain,
     byConfidence,
     topCauses,
+    costEstimate: estimateDiagnoseCost(byProvider),
   };
 }
 
@@ -477,5 +488,6 @@ async function getInsightsPg(userId: string): Promise<Insights> {
     byBrain,
     byConfidence,
     topCauses,
+    costEstimate: estimateDiagnoseCost(byProvider),
   };
 }

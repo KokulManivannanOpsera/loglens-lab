@@ -13,6 +13,9 @@ import { log, PROMPT_VERSION } from "./lib/logger.js";
 import { getMetricsSnapshot, observeDiagnose } from "./lib/metrics.js";
 import { runDiagnose } from "./lib/runDiagnose.js";
 import { getServerEnvInfo, isLlmConfigured, redactSecrets } from "./lib/secrets.js";
+import { endSse, initSse, sendSse } from "./lib/sse.js";
+import { notifySlackBackground } from "./lib/slackNotify.js";
+import { streamDiagnoseRun } from "./lib/streamDiagnose.js";
 import { requestContext } from "./middleware/requestContext.js";
 import { agentRouter } from "./routes/agent.js";
 import { authRouter } from "./routes/auth.js";
@@ -49,7 +52,7 @@ app.get("/api/health", async (_req, res) => {
   res.json({
     status: "ok",
     service: "loglens-server",
-    phase: "A4",
+    phase: "A3c",
     llmConfigured: isLlmConfigured(),
     auth: "cookie-jwt",
     historyDb,
@@ -175,6 +178,16 @@ app.post("/api/diagnose", requireAuth, async (req, res) => {
       fixtureId: fixtureId ?? null,
     });
 
+    if (response.diagnosis.needsHumanReview) {
+      notifySlackBackground({
+        kind: "needs_review",
+        requestId,
+        runId,
+        summary: response.diagnosis.summary,
+        provider: response.diagnosis.provider,
+      });
+    }
+
     res.json({
       ...response,
       meta: { ...response.meta, runId, fromCache: false },
@@ -183,12 +196,144 @@ app.post("/api/diagnose", requireAuth, async (req, res) => {
     observeDiagnose({ ok: false, latencyMs: 0 });
     const message = err instanceof Error ? err.message : "diagnose failed";
     log("error", "diagnose_failed", { requestId, err: message });
+    notifySlackBackground({
+      kind: "diagnose_failed",
+      requestId,
+      error: redactSecrets(message),
+    });
     res.status(502).json({
       error: redactSecrets(message),
       hint: "Set OPENAI_API_KEY in server/.env (see SECRETS.md) or use mode=mock / DIAGNOSE_MODE=auto",
       requestId,
     });
   }
+});
+
+/**
+ * A5 — SSE diagnose stream (preview deltas + cancel via disconnect).
+ * Final product shape only on event "done". Deltas are not parseable JSON.
+ */
+app.post("/api/diagnose/stream", requireAuth, async (req, res) => {
+  const requestId = req.requestId ?? "unknown";
+  const { logText, fixtureId, mode } = req.body as {
+    logText?: string;
+    fixtureId?: string | null;
+    mode?: string;
+  };
+  const text = logText ?? "";
+  const userId = req.user!.id;
+  const logHash = hashLog(text);
+
+  const cached = text.trim() ? cacheGet(userId, logHash) : null;
+  if (cached) {
+    initSse(res);
+    sendSse(res, "status", { phase: "cache", detail: "hit" });
+    sendSse(res, "done", {
+      ...cached.response,
+      meta: {
+        ...cached.response.meta,
+        runId: cached.runId,
+        fromCache: true,
+        latencyMs: 0,
+        streamed: true,
+      },
+    });
+    endSse(res);
+    return;
+  }
+
+  initSse(res);
+  const ac = new AbortController();
+  const onClose = () => ac.abort();
+  req.on("close", onClose);
+  res.on("close", onClose);
+
+  const result = await streamDiagnoseRun(
+    {
+      logText: text,
+      fixtureId,
+      mode,
+      requestId,
+      signal: ac.signal,
+    },
+    (ev) => sendSse(res, ev.event, ev.data),
+  );
+
+  req.off("close", onClose);
+  res.off("close", onClose);
+
+  if (result.outcome === "done") {
+    let runId: string | null = null;
+    const response = {
+      ...result.response,
+      meta: { ...result.response.meta, streamed: true as const },
+    };
+    try {
+      runId = await saveDiagnosisRun({
+        userId,
+        logText: text,
+        fixtureId,
+        response,
+      });
+      cacheSet(userId, logHash, runId, response);
+      enqueue({
+        type: "audit_log",
+        userId,
+        runId,
+        provider: response.diagnosis.provider,
+        at: new Date().toISOString(),
+      });
+    } catch (persistErr) {
+      log("error", "history_save_failed", {
+        requestId,
+        err: persistErr instanceof Error ? persistErr.message : "save failed",
+      });
+    }
+
+    observeDiagnose({
+      ok: true,
+      fromCache: false,
+      latencyMs: response.meta.latencyMs,
+      ragWeak: response.meta.ragWeak,
+      needsHumanReview: response.diagnosis.needsHumanReview,
+    });
+    log("info", "diagnose_stream", {
+      requestId,
+      runId,
+      outcome: "done",
+      brain: response.meta.brain,
+      logChars: text.length,
+    });
+    if (response.diagnosis.needsHumanReview) {
+      notifySlackBackground({
+        kind: "needs_review",
+        requestId,
+        runId,
+        summary: response.diagnosis.summary,
+        provider: response.diagnosis.provider,
+      });
+    }
+    sendSse(res, "done", {
+      ...response,
+      meta: { ...response.meta, runId, fromCache: false },
+    });
+  } else if (result.outcome === "cancelled") {
+    log("info", "diagnose_stream", { requestId, outcome: "cancelled" });
+  } else {
+    observeDiagnose({ ok: false, latencyMs: 0 });
+    log("error", "diagnose_stream", {
+      requestId,
+      outcome: "error",
+      err: result.error,
+    });
+    notifySlackBackground({
+      kind: "diagnose_failed",
+      requestId,
+      error: result.error,
+    });
+  }
+
+  endSse(res);
 });
 
 const boot = await initDb().catch((err) => {

@@ -19,11 +19,11 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 
 | Track | Done | Next |
 |-------|------|------|
-| AI | A0–A2b, **A3**, **A3b**, **A4/A4b** ✅ (+ Python brain) | A5 streaming |
-| DevOps | D0–D4, D6, AUTH, **D10**, **D5**, **D9**, **D7**, **D8** ✅ | BRING / A5 |
+| AI | A0–A2b, **A3**, **A3b**, **A4/A4b**, **A5**, **A3c** ✅ (+ Python brain) | A7 optional / mid BRING |
+| DevOps | D0–D4, D6, AUTH, **D10**, **D5**, **D9**, **D7**, **D8** ✅ | BRING mid / D11 |
 | Data | **DATA-0**, **D7** ✅ | Redis; real queue |
 | Architecture | SPLIT + **MS** (web/api/ai) ✅ | — |
-| Coverage | BRING listed (not built) | Pull bringables when spine allows |
+| Coverage | **BRING early** ✅ | Mid / security bringables |
 
 **Full phase list (do in this order)**
 
@@ -45,15 +45,15 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 | 14 | **A2b** Embeddings + hybrid RAG | ✅ | Vectors, similarity, hybrid retrieve |
 | 15 | **A3** AI evals | ✅ | Golden fixtures, score + regressions |
 | 16 | **D4** CI (GitHub Actions) | ✅ | test + eval + build on PR |
-| 17 | **BRING** (early) | ☐ | Design tokens, Slack webhook, Insights cost, shadcn |
+| 17 | **BRING** (early) | ✅ | Design tokens, Slack webhook, Insights cost, UI kit |
 | 18 | **D10** Registry + scan | ✅ | GHCR + Trivy + Dependabot |
 | 19 | **D5** PaaS deploy | ✅ | Public HTTPS URL (Render Blueprint) |
 | 20 | **D9** CD | ✅ | Staging → prod, rollback |
 | 21 | **BRING** (mid) | ☐ | k6 load, Ollama, DuckDB + export ETL |
 | 22 | **A3b** + **D8** Observe | ✅ | Metrics/logs; AI ungrounded rate |
 | 23 | **A4** + **A4b** Agents + safety | ✅ | Tools, allowlists, no auto-write |
-| 24 | **A5** Streaming UX | ☐ | Token stream, cancel |
-| 25 | **A3c** Human feedback | ☐ | Thumbs → eval set |
+| 24 | **A5** Streaming UX | ✅ | Token stream, cancel |
+| 25 | **A3c** Human feedback | ✅ | Thumbs → eval set |
 | 26 | **D7** Managed Postgres | ✅ | Swap SQLite schema → Postgres |
 | 27 | **BRING** (security) | ☐ | ZAP baseline (after D5), Checkov (with D11) |
 | 28 | **D11** IaC light | ☐ | Terraform/Pulumi |
@@ -154,9 +154,10 @@ AI brain sits inside the app:
 **How:** [`OBSERVE.md`](./OBSERVE.md), `server/src/lib/metrics.ts`, `logger.ts`  
 
 
-### A3c — Human feedback loop
-- [ ] Thumbs up/down on diagnosis  
-- [ ] Feed misses back into eval set  
+### A3c — Human feedback loop ✅
+- [x] Thumbs up/down on diagnosis  
+- [x] Feed misses back into eval candidates (manual promote to goldens)  
+**How:** [`FEEDBACK.md`](./FEEDBACK.md), `POST /api/history/:id/feedback`
 
 ### A4 — Tools + light agent ✅
 - [x] Tool calling (search runbook, grep log)  
@@ -170,10 +171,11 @@ AI brain sits inside the app:
 - [x] Unsafe-action guardrails (pattern refuse; PII polish later)  
 **How:** [`AGENTS.md`](./AGENTS.md), `ai/app/agent.py`, `server/src/lib/agent.ts`
 
-### A5 — Streaming UX
-- [ ] Token stream to UI  
-- [ ] Cancel mid-flight  
-- [ ] Partial JSON pitfalls  
+### A5 — Streaming UX ✅
+- [x] Token / preview stream to UI (SSE)  
+- [x] Cancel mid-flight (`AbortController`)  
+- [x] Partial JSON pitfalls (only parse `done`)  
+**How:** [`STREAM.md`](./STREAM.md), `POST /api/diagnose/stream`
 
 ### A6 — Memory / history + cache
 - [x] Durable diagnosis history (DATA-0 SQLite)  
@@ -321,12 +323,12 @@ See canvas **LogLens — role coverage map** and Phase Notes phase **BRING**. Pu
 
 | Role | Bring with | Tool |
 |------|------------|------|
-| Design | anytime | CSS tokens + wireframe doc (Excalidraw/Figma) |
-| Chat / on-call light | after AUTH | Slack Incoming Webhook |
-| UI kit | UI polish | shadcn/ui |
+| Design | anytime | ✅ CSS tokens + wireframe — [`DESIGN.md`](./DESIGN.md) |
+| Chat / on-call light | after AUTH | ✅ Slack Incoming Webhook — `slackNotify.ts` |
+| UI kit | UI polish | ✅ shadcn-shaped primitives — `client/src/ui/` |
 | Load | after D4 | k6 vs health/diagnose |
 | GitOps | after D12 | Flux or Argo CD (thin) |
-| Cost | with Insights | token/$ estimate on Insights |
+| Cost | with Insights | ✅ token/$ estimate on Insights — `costEstimate.ts` |
 | DAST | after D5 | OWASP ZAP baseline in CI |
 | Policy / IaC | with D11 | Checkov / tfsec |
 | AI frameworks | optional | thin LangChain/LlamaIndex |
@@ -484,3 +486,18 @@ Developer → PR → CI (lint/test/eval/build/scan)
 - date: 2026-10-23
 - what built: allowlisted tool agent (grep_log, search_runbook, create_ticket_draft); max 3 steps; write = pending + shadow approve API/UI; refuse destructive/auto-prod/skip-CI; Python + Node mirror; AGENTS.md
 - prove aloud: tool trail on diagnose; Approve records audit with executed=false; unsafe log → refusedSignals and no ticket draft
+
+### A5
+- date: 2026-10-23
+- what built: SSE `/api/diagnose/stream` (status + preview deltas + done); Cancel via AbortController; UI stream preview; STREAM.md
+- prove aloud: deltas are not JSON; only `done` commits diagnosis; Cancel stops mid-preview
+
+### BRING (early)
+- date: 2026-10-23
+- what built: design tokens + DESIGN.md; Slack webhook notify; Insights cost proxy; UI Button/Badge/Input; BRING.md
+- prove aloud: change --accent; unset Slack = no-op; Insights shows est. $; History uses ui primitives
+
+### A3c
+- date: 2026-10-23
+- what built: Helpful/Miss on saved runs; diagnosis_feedback table; downs → feedback-candidates.jsonl; FEEDBACK.md
+- prove aloud: Miss appends a candidate line; promote to goldens by hand; thumbs ≠ auto-fix model

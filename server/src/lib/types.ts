@@ -48,6 +48,8 @@ export type DiagnoseResponse = {
     runId?: string | null;
     /** DATA-0: served from in-process log-hash cache */
     fromCache?: boolean;
+    /** A5 — response came from /api/diagnose/stream */
+    streamed?: boolean;
     /** A4 — tool-using agent trail + pending write approvals */
     agent?: {
       enabled: boolean;

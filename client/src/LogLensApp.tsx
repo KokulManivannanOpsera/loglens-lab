@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AuthScreen, type AuthUser } from "./AuthScreen";
+import { Badge } from "./ui/Badge";
+import { Button } from "./ui/Button";
+import { Input } from "./ui/Input";
 import type {
   DiagnoseResponse,
   Diagnosis,
@@ -15,6 +18,18 @@ const jsonCred = {
   headers: { "Content-Type": "application/json" },
 };
 
+/** A5 — parse one SSE block (`event:` + `data:`). */
+function parseSseBlock(block: string): { event: string; data: string } | null {
+  let event = "message";
+  const dataLines: string[] = [];
+  for (const line of block.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
+  }
+  if (!dataLines.length) return null;
+  return { event, data: dataLines.join("\n") };
+}
+
 export function LogLensApp() {
   const [authReady, setAuthReady] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -24,8 +39,14 @@ export function LogLensApp() {
   const [activeFixture, setActiveFixture] = useState<string | null>(null);
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [meta, setMeta] = useState<DiagnoseResponse["meta"] | null>(null);
+  const [feedbackRating, setFeedbackRating] = useState<"up" | "down" | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
+  const [streamPreview, setStreamPreview] = useState("");
+  const [streamPhase, setStreamPhase] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const diagnoseAbort = useRef<AbortController | null>(null);
 
   const [history, setHistory] = useState<HistoryListItem[]>([]);
   const [historyQ, setHistoryQ] = useState("");
@@ -127,6 +148,7 @@ export function LogLensApp() {
     setError(null);
     setDiagnosis(null);
     setMeta(null);
+    setFeedbackRating(null);
     const res = await fetch(`/api/fixtures/${id}`, { credentials: "include" });
     if (res.status === 401) {
       setUser(null);
@@ -141,35 +163,104 @@ export function LogLensApp() {
     setActiveFixture(id);
   }, []);
 
+  function onCancelDiagnose() {
+    diagnoseAbort.current?.abort();
+  }
+
   async function onDiagnose() {
+    diagnoseAbort.current?.abort();
+    const ac = new AbortController();
+    diagnoseAbort.current = ac;
+
     setLoading(true);
     setError(null);
+    setDiagnosis(null);
+    setMeta(null);
+    setFeedbackRating(null);
+    setStreamPreview("");
+    setStreamPhase("start");
+
     try {
-      const res = await fetch("/api/diagnose", {
+      const res = await fetch("/api/diagnose/stream", {
         method: "POST",
         ...jsonCred,
+        signal: ac.signal,
         body: JSON.stringify({
           logText,
           fixtureId: activeFixture,
           mode: "auto",
         }),
       });
-      const data = (await res.json()) as DiagnoseResponse & { error?: string };
       if (res.status === 401) {
         setUser(null);
         setError("Session expired — please log in again");
         return;
       }
-      if (!res.ok) {
-        setError(data.error || "Diagnose failed");
+      if (!res.ok || !res.body) {
+        const errBody = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setError(errBody.error || "Diagnose stream failed");
         return;
       }
-      setDiagnosis(data.diagnosis);
-      setMeta(data.meta);
-    } catch {
-      setError("Network error");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let gotDone = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+        for (const part of parts) {
+          const parsed = parseSseBlock(part.trim());
+          if (!parsed) continue;
+          let payload: unknown = null;
+          try {
+            payload = JSON.parse(parsed.data);
+          } catch {
+            // Partial JSON pitfall: never treat bad/incomplete data as diagnosis
+            continue;
+          }
+          if (parsed.event === "status") {
+            const p = payload as { phase?: string; detail?: string };
+            setStreamPhase(p.detail || p.phase || "…");
+          } else if (parsed.event === "delta") {
+            const d = payload as { text?: string };
+            if (d.text) setStreamPreview((prev) => prev + d.text);
+          } else if (parsed.event === "done") {
+            const data = payload as DiagnoseResponse;
+            setDiagnosis(data.diagnosis);
+            setMeta(data.meta);
+            setStreamPreview("");
+            setStreamPhase(null);
+            gotDone = true;
+          } else if (parsed.event === "error") {
+            const e = payload as { error?: string };
+            setError(e.error || "Stream error");
+          } else if (parsed.event === "cancelled") {
+            setError("Cancelled");
+            setStreamPhase(null);
+          }
+        }
+      }
+
+      if (!gotDone && !ac.signal.aborted) {
+        setError((prev) => prev ?? "Stream ended before a complete diagnosis");
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("Cancelled");
+        setStreamPhase(null);
+      } else {
+        setError("Network error");
+      }
     } finally {
       setLoading(false);
+      diagnoseAbort.current = null;
     }
   }
 
@@ -188,9 +279,11 @@ export function LogLensApp() {
     const detail = (await res.json()) as {
       diagnosis: Diagnosis;
       meta: DiagnoseResponse["meta"];
+      feedback?: { rating: "up" | "down" } | null;
     };
     setDiagnosis(detail.diagnosis);
     setMeta({ ...detail.meta, runId: id, fromCache: false });
+    setFeedbackRating(detail.feedback?.rating ?? null);
     setView("diagnose");
   }
 
@@ -225,9 +318,9 @@ export function LogLensApp() {
           <div className="badge">React · Express · Auth · History</div>
           <div className="user-bar">
             <span className="user-email">{user.email}</span>
-            <button type="button" className="ghost small" onClick={onLogout}>
+            <Button variant="ghost" size="sm" onClick={() => void onLogout()}>
               Log out
-            </button>
+            </Button>
           </div>
         </div>
         <h1>LogLens</h1>
@@ -280,40 +373,58 @@ export function LogLensApp() {
               spellCheck={false}
             />
             <div className="actions">
-              <button
-                className="primary"
-                type="button"
+              <Button
                 disabled={loading || !logText.trim()}
-                onClick={onDiagnose}
+                onClick={() => void onDiagnose()}
               >
-                {loading ? "Diagnosing…" : "Diagnose"}
-              </button>
-              <button
-                className="ghost"
-                type="button"
+                {loading ? "Streaming…" : "Diagnose"}
+              </Button>
+              {loading && (
+                <Button variant="danger" onClick={onCancelDiagnose}>
+                  Cancel
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                disabled={loading}
                 onClick={() => {
                   setLogText("");
                   setDiagnosis(null);
                   setMeta(null);
+                  setFeedbackRating(null);
+                  setStreamPreview("");
+                  setStreamPhase(null);
                   setActiveFixture(null);
                 }}
               >
                 Clear
-              </button>
+              </Button>
             </div>
             {error && <p className="error">{error}</p>}
           </section>
 
           <section className="panel">
             <h2>Draft diagnosis</h2>
-            {!diagnosis ? (
-              <p className="empty">
-                Structured output: cause, evidence, next steps, confidence. Human
-                still decides what to do next.
-              </p>
-            ) : (
-              <DiagnosisView diagnosis={diagnosis} meta={meta} />
+            {loading && streamPhase && (
+              <p className="empty stream-phase">phase: {streamPhase}</p>
             )}
+            {loading && streamPreview && (
+              <pre className="stream-preview">{streamPreview}</pre>
+            )}
+            {!diagnosis && !loading && !streamPreview ? (
+              <p className="empty">
+                Structured output streams in; only the final event is a real
+                diagnosis. Cancel anytime. Human still decides what to do next.
+              </p>
+            ) : null}
+            {diagnosis ? (
+              <DiagnosisView
+                diagnosis={diagnosis}
+                meta={meta}
+                feedbackRating={feedbackRating}
+                onFeedback={setFeedbackRating}
+              />
+            ) : null}
           </section>
         </div>
       )}
@@ -332,25 +443,24 @@ export function LogLensApp() {
               void loadHistory(historyQ);
             }}
           >
-            <input
+            <Input
               value={historyQ}
               onChange={(e) => setHistoryQ(e.target.value)}
               placeholder="Search causes, summaries…"
               aria-label="Search history"
             />
-            <button className="primary" type="submit" disabled={historyLoading}>
+            <Button type="submit" disabled={historyLoading}>
               {historyLoading ? "…" : "Search"}
-            </button>
-            <button
-              className="ghost"
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() => {
                 setHistoryQ("");
                 void loadHistory("");
               }}
             >
               Reset
-            </button>
+            </Button>
           </form>
           {error && <p className="error">{error}</p>}
           {history.length === 0 && !historyLoading ? (
@@ -369,13 +479,19 @@ export function LogLensApp() {
                     </span>
                     <span className="history-cause">{item.likelyCause}</span>
                     <span className="history-meta">
-                      <span className="pill">{item.provider}</span>
-                      <span className="pill">{item.brain}</span>
+                      <Badge>{item.provider}</Badge>{" "}
+                      <Badge tone="accent">{item.brain}</Badge>
                       {item.needsHumanReview && (
-                        <span className="pill review">review</span>
+                        <>
+                          {" "}
+                          <Badge tone="warn">review</Badge>
+                        </>
                       )}
                       {item.ragWeak && (
-                        <span className="pill review">rag weak</span>
+                        <>
+                          {" "}
+                          <Badge tone="danger">rag weak</Badge>
+                        </>
                       )}
                     </span>
                   </button>
@@ -391,6 +507,7 @@ export function LogLensApp() {
           <h2>Insights</h2>
           <p className="empty" style={{ marginBottom: "0.75rem" }}>
             SQL aggregations over your history — BI-lite (no warehouse yet).
+            Cost is a proxy, not a bill.
           </p>
           {insightsLoading && <p className="empty">Loading…</p>}
           {error && <p className="error">{error}</p>}
@@ -412,6 +529,22 @@ export function LogLensApp() {
                 <div className="insight-value">{insights.ragWeakCount}</div>
                 <div className="insight-label">RAG weak</div>
               </div>
+              {insights.costEstimate && (
+                <div className="insight-stat">
+                  <div className="insight-value">
+                    ${insights.costEstimate.estimatedUsd.toFixed(4)}
+                  </div>
+                  <div className="insight-label">
+                    Est. LLM $ ({insights.costEstimate.openaiRuns} openai ·{" "}
+                    {insights.costEstimate.mockRuns} mock)
+                  </div>
+                </div>
+              )}
+              {insights.costEstimate && (
+                <p className="empty" style={{ gridColumn: "1 / -1" }}>
+                  {insights.costEstimate.note}
+                </p>
+              )}
               <InsightTable
                 title="By provider"
                 rows={insights.byProvider.map((r) => [r.provider, r.count])}
@@ -478,12 +611,54 @@ function InsightTable({
 function DiagnosisView({
   diagnosis,
   meta,
+  feedbackRating,
+  onFeedback,
 }: {
   diagnosis: Diagnosis;
   meta: DiagnoseResponse["meta"] | null;
+  feedbackRating: "up" | "down" | null;
+  onFeedback: (r: "up" | "down" | null) => void;
 }) {
   const [approveMsg, setApproveMsg] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+
+  async function sendFeedback(rating: "up" | "down") {
+    const runId = meta?.runId;
+    if (!runId) {
+      setFeedbackMsg("Save a diagnosis first (run Diagnose) to rate it.");
+      return;
+    }
+    setFeedbackBusy(true);
+    setFeedbackMsg(null);
+    try {
+      const res = await fetch(`/api/history/${runId}/feedback`, {
+        method: "POST",
+        ...jsonCred,
+        body: JSON.stringify({ rating }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        evalCandidate?: string | null;
+      };
+      if (!res.ok) {
+        setFeedbackMsg(data.error || "Feedback failed");
+        return;
+      }
+      onFeedback(rating);
+      setFeedbackMsg(
+        rating === "down"
+          ? data.evalCandidate ||
+              "Thanks — miss logged for eval candidates."
+          : "Thanks — marked helpful.",
+      );
+    } catch {
+      setFeedbackMsg("Network error on feedback");
+    } finally {
+      setFeedbackBusy(false);
+    }
+  }
 
   async function onApprove(
     toolCallId: string,
@@ -540,6 +715,12 @@ function DiagnosisView({
           <>
             {" "}
             <span className="pill">from cache</span>
+          </>
+        )}
+        {meta?.streamed && (
+          <>
+            {" "}
+            <span className="pill">streamed</span>
           </>
         )}
         {meta?.runId && (
@@ -720,6 +901,37 @@ function DiagnosisView({
             {" "}
             <span className="pill review">needs human review</span>
           </>
+        )}
+      </dd>
+      <dt>Feedback</dt>
+      <dd>
+        <div className="feedback-row">
+          <Button
+            size="sm"
+            variant={feedbackRating === "up" ? "primary" : "ghost"}
+            disabled={feedbackBusy || !meta?.runId}
+            onClick={() => void sendFeedback("up")}
+          >
+            Helpful
+          </Button>
+          <Button
+            size="sm"
+            variant={feedbackRating === "down" ? "danger" : "ghost"}
+            disabled={feedbackBusy || !meta?.runId}
+            onClick={() => void sendFeedback("down")}
+          >
+            Miss
+          </Button>
+        </div>
+        {!meta?.runId && (
+          <p className="empty" style={{ marginTop: "0.35rem" }}>
+            Rate after a saved run (Diagnose stores history).
+          </p>
+        )}
+        {feedbackMsg && (
+          <p className="empty" style={{ marginTop: "0.35rem" }}>
+            {feedbackMsg}
+          </p>
         )}
       </dd>
     </dl>

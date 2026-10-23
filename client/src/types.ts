@@ -38,6 +38,8 @@ export type DiagnoseResponse = {
     brain?: "python" | "node-local";
     runId?: string | null;
     fromCache?: boolean;
+    /** A5 — from SSE /api/diagnose/stream */
+    streamed?: boolean;
     /** A4 — tool trail + pending write approvals */
     agent?: {
       enabled: boolean;
@@ -88,4 +90,12 @@ export type Insights = {
   byBrain: { brain: string; count: number }[];
   byConfidence: { confidence: string; count: number }[];
   topCauses: { cause: string; count: number }[];
+  costEstimate?: {
+    currency: "USD";
+    openaiRuns: number;
+    mockRuns: number;
+    estimatedUsd: number;
+    usdPerOpenaiRun: number;
+    note: string;
+  };
 };
