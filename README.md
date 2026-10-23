@@ -1,37 +1,70 @@
 # LogLens Lab
 
-**CI log → draft diagnosis** — learn **AI engineering + DevOps** on one small app.
+**CI log → draft diagnosis** — learn **AI engineering + DevOps** on one app.
 
-**Phase A1 (now):** React + Node (Next.js). **OpenAI** when `OPENAI_API_KEY` is set; otherwise **mock** (A0).
+**Architecture (now):** separated **React client** + **Node (Express) API**.
+
+```text
+Browser :5173  ──proxy /api──►  Express API :8091  ──►  AI (Python) :8092  ──►  OpenAI (optional)
+                                      auth + fixtures         RAG + diagnose
+```
 
 ## Run
 
 ```bash
 cd labs/loglens
 npm install
-cp .env.example .env.local   # optional: add OPENAI_API_KEY
-npm run dev
+
+cp server/.env.example server/.env   # D6: real key only in .env (gitignored)
+# optional: edit server/.env → OPENAI_API_KEY=...
+
+npm run dev   # AI :8092 + API :8091 + UI :5173
 ```
 
-Open [http://localhost:8091](http://localhost:8091).
+Open **http://localhost:5173** (UI). **Sign up / log in** first — diagnose and fixtures require a session.
 
-- Load a fixture → **Diagnose**
-- Health: [http://localhost:8091/api/health](http://localhost:8091/api/health) (`llmConfigured: true/false`)
+- API health: **http://localhost:8091/api/health** (includes `aiService`)
+- AI health: **http://localhost:8092/health**
+
+Vite proxies `/api/*` from the UI to the API (cookies included via `credentials: "include"`).  
+Python AI details: **[ai/README.md](./ai/README.md)**.
+
+Without Python: `npm run dev:node-only` (in-process Node diagnose).
+
+## Docker (D2 + D3 + AI service)
+
+See **[DOCKER.md](./DOCKER.md)**. Short version:
+
+```bash
+docker compose up --build
+# UI  http://localhost:8088
+# API http://localhost:8091/api/health
+# AI  http://localhost:8092/health
+```
+
+## Secrets (D6)
+
+See **[SECRETS.md](./SECRETS.md)**. Short version: key in `server/.env`, never in Git, never in the React client.
 
 ## Tests
 
+With the API running on 8091:
+
 ```bash
-# with app running on 8091
 npm test
 ```
 
-## Learning tracker (everything in one file)
+## Learning
 
-**[LEARNING.md](./LEARNING.md)** — AI ladder + DevOps + full CI/CD + cloud + checklists + progress log.
+- Tracker: [LEARNING.md](./LEARNING.md)
+- Agents: [AGENTS.md](./AGENTS.md)
+- Streaming: [STREAM.md](./STREAM.md)
+- Early bringables: [BRING.md](./BRING.md) · [DESIGN.md](./DESIGN.md)
+- Feedback: [FEEDBACK.md](./FEEDBACK.md)
+- Flow diagram: [PRODUCT_FLOW.html](./PRODUCT_FLOW.html)
+- Git/PR: [GIT_PR.md](./GIT_PR.md)
 
 | Track | Next |
 |-------|------|
-| AI | A1b / A1c or D6 secrets |
-| DevOps | D2 Dockerfile (see [GIT_PR.md](./GIT_PR.md)) |
-
-Todo lab (`labs/todo-devops`) = Docker practice history; **LogLens is the main path**.
+| AI | mid BRING / A7 optional |
+| DevOps | BRING mid / D11 IaC |

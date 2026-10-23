@@ -1,0 +1,26 @@
+# API_UPSTREAM / PORT substituted at container start (nginx image envsubst).
+# D3 compose:     API_UPSTREAM=http://api:8091  PORT=80
+# D5 PaaS:        API_UPSTREAM=http://loglens-api:10000  PORT=$PORT (host sets)
+# D2 docker run:  API_UPSTREAM=http://loglens-api:8091
+
+server {
+  listen ${PORT};
+  server_name _;
+  root /usr/share/nginx/html;
+  index index.html;
+
+  location /api/ {
+    proxy_pass ${API_UPSTREAM};
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Cookie $http_cookie;
+    proxy_pass_header Set-Cookie;
+  }
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}

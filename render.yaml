@@ -1,0 +1,69 @@
+# D5 — PaaS deploy (Render Blueprint)
+# Dashboard: New → Blueprint → connect this repo → apply.
+# Public entry = loglens-web HTTPS URL. Browser → web → api → ai (private DNS).
+#
+# Free plan may be unavailable in some regions — bump plan: starter if prompted.
+# Docs: DEPLOY.md
+
+services:
+  - type: web
+    name: loglens-ai
+    runtime: docker
+    plan: free
+    dockerfilePath: ./ai/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: KNOWLEDGE_DIR
+        value: /app/knowledge/runbooks
+      - key: DIAGNOSE_MODE
+        value: auto
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: OPENAI_API_KEY
+        sync: false
+
+  - type: web
+    name: loglens-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: NODE_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: DIAGNOSE_MODE
+        value: auto
+      - key: AI_SERVICE_REQUIRED
+        value: "false"
+      - key: AI_SERVICE_URL
+        value: http://loglens-ai:10000
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      # D7 — optional: attach Render Postgres and paste DATABASE_URL here
+      # - key: DATABASE_URL
+      #   fromDatabase:
+      #     name: loglens-db
+      #     property: connectionString
+
+  - type: web
+    name: loglens-web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./client/Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: API_UPSTREAM
+        value: http://loglens-api:10000

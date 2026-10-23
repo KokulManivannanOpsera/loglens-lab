@@ -1,14 +1,13 @@
 {
   "environment": "staging",
-  "action": "deploy",
-  "sha": "fbe3471d29809aaea2440a987bf91f735674fc8d",
-  "shortSha": "fbe3471",
+  "action": "bootstrap",
+  "sha": null,
+  "shortSha": null,
   "images": {
-    "api": "ghcr.io/kokulmanivannanopsera/loglens-api:fbe3471d29809aaea2440a987bf91f735674fc8d",
-    "web": "ghcr.io/kokulmanivannanopsera/loglens-web:fbe3471d29809aaea2440a987bf91f735674fc8d",
-    "ai": "ghcr.io/kokulmanivannanopsera/loglens-ai:fbe3471d29809aaea2440a987bf91f735674fc8d"
+    "api": null,
+    "web": null,
+    "ai": null
   },
-  "deployedAt": "2026-10-23T05:45:23Z",
-  "runUrl": "https://github.com/KokulManivannanOpsera/loglens-lab/actions/runs/39907491862",
-  "actor": "KokulManivannanOpsera"
+  "deployedAt": null,
+  "note": "Filled by LogLens CD workflow (D9). Run Actions → LogLens CD → staging."
 }
