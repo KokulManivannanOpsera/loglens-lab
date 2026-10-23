@@ -10,6 +10,7 @@ export function LogLensApp() {
   const [logText, setLogText] = useState("");
   const [activeFixture, setActiveFixture] = useState<string | null>(null);
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
+  const [meta, setMeta] = useState<DiagnoseResponse["meta"] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,6 +24,7 @@ export function LogLensApp() {
   const loadFixture = useCallback(async (id: string) => {
     setError(null);
     setDiagnosis(null);
+    setMeta(null);
     const res = await fetch(`/api/fixtures/${id}`);
     if (!res.ok) {
       setError("Fixture not found");
@@ -40,14 +42,15 @@ export function LogLensApp() {
       const res = await fetch("/api/diagnose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logText, fixtureId: activeFixture }),
+        body: JSON.stringify({ logText, fixtureId: activeFixture, mode: "auto" }),
       });
+      const data = (await res.json()) as DiagnoseResponse & { error?: string };
       if (!res.ok) {
-        setError("Diagnose failed");
+        setError(data.error || "Diagnose failed");
         return;
       }
-      const data = (await res.json()) as DiagnoseResponse;
       setDiagnosis(data.diagnosis);
+      setMeta(data.meta);
     } catch {
       setError("Network error");
     } finally {
@@ -58,11 +61,12 @@ export function LogLensApp() {
   return (
     <div className="wrap">
       <header>
-        <div className="badge">Phase A0 · mock AI</div>
+        <div className="badge">Phase A1 · LLM + mock fallback</div>
         <h1>LogLens</h1>
         <p className="sub">
-          Paste a CI log (or load a fixture) → get a <strong>draft</strong> diagnosis.
-          No real LLM yet — rules mock the model so we learn the product shape first.
+          Paste a CI log → <strong>draft</strong> diagnosis. Uses OpenAI when{" "}
+          <code>OPENAI_API_KEY</code> is set; otherwise the A0 mock. Still no auto
+          actions.
         </p>
       </header>
 
@@ -82,6 +86,7 @@ export function LogLensApp() {
               setLogText(e.target.value);
               setActiveFixture(null);
               setDiagnosis(null);
+              setMeta(null);
             }}
             placeholder="Paste CI / test logs here…"
             spellCheck={false}
@@ -93,7 +98,7 @@ export function LogLensApp() {
               disabled={loading || !logText.trim()}
               onClick={onDiagnose}
             >
-              {loading ? "Diagnosing…" : "Diagnose (mock)"}
+              {loading ? "Diagnosing…" : "Diagnose"}
             </button>
             <button
               className="ghost"
@@ -101,6 +106,7 @@ export function LogLensApp() {
               onClick={() => {
                 setLogText("");
                 setDiagnosis(null);
+                setMeta(null);
                 setActiveFixture(null);
               }}
             >
@@ -114,15 +120,36 @@ export function LogLensApp() {
           <h2>Draft diagnosis</h2>
           {!diagnosis ? (
             <p className="empty">
-              Run diagnose to see structured output (cause, evidence, next steps,
-              confidence). Human still decides what to do next — no auto actions in A0.
+              Structured output: cause, evidence, next steps, confidence. Human
+              still decides what to do next.
             </p>
           ) : (
             <dl className="diag">
               <dt>Provider</dt>
               <dd>
                 <span className="pill">{diagnosis.provider}</span>
+                {meta?.model && (
+                  <>
+                    {" "}
+                    <span className="pill">{meta.model}</span>
+                  </>
+                )}
+                {meta?.fellBackToMock && (
+                  <>
+                    {" "}
+                    <span className="pill review">fell back to mock</span>
+                  </>
+                )}
               </dd>
+              {meta && (
+                <>
+                  <dt>Meta</dt>
+                  <dd className="empty">
+                    mode={meta.mode} · {meta.latencyMs}ms
+                    {meta.fallbackReason ? ` · ${meta.fallbackReason}` : ""}
+                  </dd>
+                </>
+              )}
               <dt>Summary</dt>
               <dd>{diagnosis.summary}</dd>
               <dt>Likely cause</dt>
@@ -161,8 +188,9 @@ export function LogLensApp() {
       </div>
 
       <footer>
-        Health: <a href="/api/health">/api/health</a> · Learning: see{" "}
-        <code>LEARNING.md</code> · Port <code>8091</code>
+        Health: <a href="/api/health">/api/health</a> · Copy{" "}
+        <code>.env.example</code> → <code>.env.local</code> for a real key · Port{" "}
+        <code>8091</code>
       </footer>
     </div>
   );

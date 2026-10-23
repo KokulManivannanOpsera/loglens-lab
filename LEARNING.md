@@ -13,8 +13,8 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 
 | Track | Done | Next |
 |-------|------|------|
-| AI | A0 | A1 |
-| DevOps / CI/CD / Cloud | D0, D1 | D2 Dockerfile (or A1) |
+| AI | A0, A1 | A1b truncation depth / A1c injection hardening / D6 secrets |
+| DevOps / CI/CD / Cloud | D0, D1 | D2 Dockerfile or D6 (for real key in prod) |
 
 **Suggested interleave**
 
@@ -66,13 +66,15 @@ AI brain sits inside the app:
 - [x] HITL intro (draft ≠ action)  
 **How:** `POST /api/diagnose` → `mockDiagnose()`; `fixtures/logs/`
 
-### A1 — Real LLM
-- [ ] LLM API (OpenAI/Anthropic/etc.)  
-- [ ] System + user prompts  
-- [ ] Temperature, tokens, cost awareness  
-- [ ] Timeouts, retries, rate-limit backoff (429)  
-- [ ] Safe JSON parse; degrade if no key  
-- [ ] Same `Diagnosis` type as mock  
+### A1 — Real LLM ✅
+- [x] LLM API (OpenAI Chat Completions)  
+- [x] System + user prompts  
+- [x] Temperature (0.2), model via env  
+- [x] Timeouts (`OPENAI_TIMEOUT_MS`); auto→mock on failure  
+- [x] Safe JSON parse; degrade if no key  
+- [x] Same `Diagnosis` type as mock (`provider: openai | mock`)  
+**How:** `runDiagnose()` + `openaiDiagnose()`; copy `.env.example` → `.env.local`  
+**Still light:** full retry/429 loop = polish later; deeper truncation = A1b
 
 ### A1b — Context window / truncation
 - [ ] Huge logs don’t fit context  
@@ -295,3 +297,8 @@ Developer → PR → CI (lint/test/eval/build/scan)
 - date: 2026-10-19
 - what built: git init; `main` = A0 baseline; branch + PR for D1 docs; GitHub remote
 - prove aloud: branch keeps `main` safe; PR shows the diff before merge
+
+### A1
+- date: 2026-10-20
+- what built: OpenAI path + mock fallback; `.env.example`; meta latency/fallback; soft truncate
+- prove aloud: same Diagnosis JSON for mock and openai; key never in git; draft still ≠ action
