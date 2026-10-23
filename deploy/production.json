@@ -1,0 +1,13 @@
+{
+  "environment": "production",
+  "action": "bootstrap",
+  "sha": null,
+  "shortSha": null,
+  "images": {
+    "api": null,
+    "web": null,
+    "ai": null
+  },
+  "deployedAt": null,
+  "note": "Filled by LogLens CD workflow (D9). Prefer required reviewers on the production Environment."
+}
