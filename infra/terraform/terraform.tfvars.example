@@ -1,0 +1,9 @@
+project         = "loglens"
+image_registry  = "loglens"   # after: docker build -t loglens-api:0.1 …
+image_tag       = "0.1"
+web_host_port   = 8088
+enable_postgres = false
+
+# Never commit real secrets — pass via env:
+#   export TF_VAR_session_secret='…'
+#   export TF_VAR_openai_api_key='…'

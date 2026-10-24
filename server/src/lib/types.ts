@@ -1,4 +1,4 @@
-export type Provider = "mock" | "openai";
+export type Provider = "mock" | "openai" | "ollama";
 
 export type Diagnosis = {
   provider: Provider;
@@ -19,7 +19,7 @@ export type DiagnoseResponse = {
     logChars: number;
     fixtureHint: string | null;
     /** Which path was requested */
-    mode: "auto" | "mock" | "openai";
+    mode: "auto" | "mock" | "openai" | "ollama";
     /** If openai failed and we used mock */
     fellBackToMock: boolean;
     fallbackReason: string | null;

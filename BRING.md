@@ -1,33 +1,33 @@
-# BRING — early pack (Design · Chat · UI kit · Cost)
+# BRING — early + mid packs
 
-Optional roles pulled in without blocking the AI/DevOps spine.
+Optional roles — one tool each. Spine stays hand-rolled.
 
-| Role | Tool here | Doc / code |
-|------|-----------|------------|
-| Design | CSS tokens + wireframe | [`DESIGN.md`](./DESIGN.md), `client/src/index.css` |
-| Chat / on-call light | Slack Incoming Webhook | `server/src/lib/slackNotify.ts` |
-| UI kits | shadcn-shaped primitives | `client/src/ui/*` (Button, Badge, Input) |
-| Cost | Insights $ proxy | `server/src/lib/costEstimate.ts` |
+## Early (done)
 
-## Slack setup
+| Role | Tool | Doc / code |
+|------|------|------------|
+| Design | CSS tokens + wireframe | [`DESIGN.md`](./DESIGN.md) |
+| Chat / on-call | Slack Incoming Webhook | `slackNotify.ts` |
+| UI kits | Button / Badge / Input | `client/src/ui/` |
+| Cost | Insights $ proxy | `costEstimate.ts` |
 
-1. Slack → Incoming Webhooks → create → copy URL  
-2. `SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...` in `.env`  
-3. Diagnose a log that needs review → channel gets a message  
+## Mid (done)
 
-Unset URL = no-op (safe for local).
+| Role | Tool | Doc / code |
+|------|------|------------|
+| Load | k6 smoke | [`LOAD.md`](./LOAD.md), `scripts/load/smoke.js` |
+| Serving | Ollama local model | `ollamaDiagnose.ts`, `DIAGNOSE_MODE=ollama` |
+| Warehouse | DuckDB file | `scripts/etl/load_duckdb.py` |
+| ETL light | export CSV → DuckDB | `export-history` + `load_duckdb.py` |
 
-## Cost proxy
+See [`LOAD.md`](./LOAD.md) for commands and prove-aloud.
 
-Insights shows `estimatedUsd` from `openai` run counts × `COST_USD_PER_OPENAI_RUN` (default `0.0002`). Mock = $0. Not real billing.
+## Security lite (with D11)
 
-## UI kit note
+| Role | Tool | Doc |
+|------|------|-----|
+| Policy / IaC | Checkov on Terraform | [`IAC.md`](./IAC.md) — `npm run iac:checkov` |
 
-Full **shadcn/ui + Tailwind** is optional later. Early bring uses the same *role* (reusable primitives) with CSS tokens so we don’t rewrite the app bundler mid-lab.
+## Still optional later
 
-## Prove aloud
-
-1. Tokens: change `--accent` — primary buttons update  
-2. Slack: set webhook, force needs-review diagnose, see channel ping  
-3. Insights: open Cost card — openai runs drive estimate  
-4. UI: History search uses `Input` + `Button` from `ui/`  
+ZAP (DAST), Flux/Argo (after D12), thin LangChain.

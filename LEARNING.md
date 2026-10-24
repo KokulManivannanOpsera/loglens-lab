@@ -20,10 +20,10 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 | Track | Done | Next |
 |-------|------|------|
 | AI | A0–A2b, **A3**, **A3b**, **A4/A4b**, **A5**, **A3c** ✅ (+ Python brain) | A7 optional / mid BRING |
-| DevOps | D0–D4, D6, AUTH, **D10**, **D5**, **D9**, **D7**, **D8** ✅ | BRING mid / D11 |
+| DevOps | … **D8**, **D11** ✅ | D12 K8s / security BRING |
 | Data | **DATA-0**, **D7** ✅ | Redis; real queue |
 | Architecture | SPLIT + **MS** (web/api/ai) ✅ | — |
-| Coverage | **BRING early** ✅ | Mid / security bringables |
+| Coverage | **BRING early + mid + Checkov** ✅ | ZAP / GitOps |
 
 **Full phase list (do in this order)**
 
@@ -49,14 +49,14 @@ Each step: **pain → what → how here → prove aloud** (5–10 lines in the P
 | 18 | **D10** Registry + scan | ✅ | GHCR + Trivy + Dependabot |
 | 19 | **D5** PaaS deploy | ✅ | Public HTTPS URL (Render Blueprint) |
 | 20 | **D9** CD | ✅ | Staging → prod, rollback |
-| 21 | **BRING** (mid) | ☐ | k6 load, Ollama, DuckDB + export ETL |
+| 21 | **BRING** (mid) | ✅ | k6 load, Ollama, DuckDB + export ETL |
 | 22 | **A3b** + **D8** Observe | ✅ | Metrics/logs; AI ungrounded rate |
 | 23 | **A4** + **A4b** Agents + safety | ✅ | Tools, allowlists, no auto-write |
 | 24 | **A5** Streaming UX | ✅ | Token stream, cancel |
 | 25 | **A3c** Human feedback | ✅ | Thumbs → eval set |
 | 26 | **D7** Managed Postgres | ✅ | Swap SQLite schema → Postgres |
-| 27 | **BRING** (security) | ☐ | ZAP baseline (after D5), Checkov (with D11) |
-| 28 | **D11** IaC light | ☐ | Terraform/Pulumi |
+| 27 | **BRING** (security) | ◐ | Checkov ✅ (D11); ZAP baseline still optional |
+| 28 | **D11** IaC light | ✅ | Terraform (Docker provider lab) |
 | 29 | **D12** Kubernetes | ☐ | kind/minikube → manifests |
 | 30 | **BRING** (GitOps) | ☐ | Flux/Argo after D12 |
 | 31 | **D13** Cloud IAM | ☐ | Least privilege |
@@ -308,8 +308,12 @@ Pre-train foundation models, full RLHF research, vision/audio/video products, 10
 **Verified:** PR Images green; `workflow_dispatch` pushed `loglens-{api,web,ai}` to GHCR.  
 
 
-### D11 — Infra as code (light)
-- [ ] Terraform/Pulumi declare host/DB  
+### D11 — Infra as code (light) ✅
+- [x] Terraform declare stack (network, ai, api, web, optional Postgres)  
+- [x] plan / apply / destroy vs click-ops  
+- [x] Secrets via `TF_VAR_*` (not committed tfvars)  
+- [x] Checkov scan path documented (BRING security lite)  
+**How:** [`IAC.md`](./IAC.md), [`infra/terraform/`](./infra/terraform/)
 
 ### D12 — Kubernetes (later)
 - [ ] Only when needed; deploy/service/rollout  
@@ -326,15 +330,15 @@ See canvas **LogLens — role coverage map** and Phase Notes phase **BRING**. Pu
 | Design | anytime | ✅ CSS tokens + wireframe — [`DESIGN.md`](./DESIGN.md) |
 | Chat / on-call light | after AUTH | ✅ Slack Incoming Webhook — `slackNotify.ts` |
 | UI kit | UI polish | ✅ shadcn-shaped primitives — `client/src/ui/` |
-| Load | after D4 | k6 vs health/diagnose |
+| Load | after D4 | ✅ k6 — [`LOAD.md`](./LOAD.md), `scripts/load/smoke.js` |
 | GitOps | after D12 | Flux or Argo CD (thin) |
 | Cost | with Insights | ✅ token/$ estimate on Insights — `costEstimate.ts` |
 | DAST | after D5 | OWASP ZAP baseline in CI |
-| Policy / IaC | with D11 | Checkov / tfsec |
+| Policy / IaC | with D11 | ✅ Checkov on `infra/terraform` — `npm run iac:checkov` |
 | AI frameworks | optional | thin LangChain/LlamaIndex |
-| Serving | optional | Ollama local fallback |
-| Warehouse stand-in | after DATA-0 | DuckDB from export |
-| ETL light | after DATA-0 | script/Prefect → CSV/DuckDB |
+| Serving | optional | ✅ Ollama — `ollamaDiagnose.ts` |
+| Warehouse stand-in | after DATA-0 | ✅ DuckDB — `scripts/etl/load_duckdb.py` |
+| ETL light | after DATA-0 | ✅ export CSV → DuckDB — `export:history` |
 
 **Stay out:** service mesh (Istio/Linkerd) — not worth it for 3 services.
 
@@ -501,3 +505,13 @@ Developer → PR → CI (lint/test/eval/build/scan)
 - date: 2026-10-23
 - what built: Helpful/Miss on saved runs; diagnosis_feedback table; downs → feedback-candidates.jsonl; FEEDBACK.md
 - prove aloud: Miss appends a candidate line; promote to goldens by hand; thumbs ≠ auto-fix model
+
+### BRING (mid)
+- date: 2026-10-24
+- what built: k6 smoke script; Ollama diagnose mode; history CSV export + DuckDB loader; LOAD.md
+- prove aloud: k6 uses mock only; Ollama = local serving; DuckDB = file warehouse for GROUP BY
+
+### D11
+- date: 2026-10-24
+- what built: Terraform Docker provider stack (ai/api/web + optional Postgres); IAC.md; Checkov command
+- prove aloud: desired state in Git; plan shows drift; secrets not in tfstate commits / tfvars gitignored

@@ -6,18 +6,26 @@ import {
 import { enrichDiagnosisWithAgent, runNodeAgent } from "./agent.js";
 import { mockDiagnose } from "./mockDiagnose.js";
 import { openaiDiagnose } from "./llmDiagnose.js";
+import { ollamaDiagnose, ollamaReachable } from "./ollamaDiagnose.js";
 import { enforceHitlPolicy, scanForInjection } from "./promptGuard.js";
 import { groundWithRag, retrieveRunbooksAsync } from "./rag.js";
 import { isLlmConfigured } from "./secrets.js";
 import { truncateLog } from "./truncateLog.js";
 import type { DiagnoseResponse, Diagnosis } from "./types.js";
 
-export type DiagnoseMode = "auto" | "mock" | "openai";
+export type DiagnoseMode = "auto" | "mock" | "openai" | "ollama";
 
 function resolveMode(requested?: string): DiagnoseMode {
   const fromEnv = (process.env.DIAGNOSE_MODE || "auto").toLowerCase();
   const raw = (requested || fromEnv) as string;
-  if (raw === "mock" || raw === "openai" || raw === "auto") return raw;
+  if (
+    raw === "mock" ||
+    raw === "openai" ||
+    raw === "auto" ||
+    raw === "ollama"
+  ) {
+    return raw;
+  }
   return "auto";
 }
 
@@ -72,7 +80,12 @@ async function runDiagnoseLocal(opts: {
   };
 
   const hasKey = isLlmConfigured();
-  const useMock = mode === "mock" || (mode === "auto" && !hasKey);
+  const preferOllama =
+    mode === "ollama" ||
+    (mode === "auto" &&
+      !hasKey &&
+      (process.env.OLLAMA_BASE_URL?.trim() ||
+        (await ollamaReachable())));
 
   let diagnosis: Diagnosis;
   let fellBackToMock = false;
@@ -81,16 +94,16 @@ async function runDiagnoseLocal(opts: {
     : null;
   let model: string | null = null;
 
-  if (useMock) {
+  if (mode === "mock" || (mode === "auto" && !hasKey && !preferOllama)) {
     diagnosis = finalizeDiagnosis(mockDiagnose(text), truncated, injection, rag);
-  } else {
+  } else if (preferOllama) {
     try {
-      const out = await openaiDiagnose(text, rag.hits);
+      const out = await ollamaDiagnose(text, rag.hits);
       diagnosis = finalizeDiagnosis(out.diagnosis, truncated, injection, rag);
       model = out.model;
     } catch (err) {
-      const reason = err instanceof Error ? err.message : "llm error";
-      if (mode === "openai") {
+      const reason = err instanceof Error ? err.message : "ollama error";
+      if (mode === "ollama") {
         throw err;
       }
       fellBackToMock = true;
@@ -106,6 +119,61 @@ async function runDiagnoseLocal(opts: {
         summary: `${diagnosis.summary} [fell back to mock: ${reason}]`,
         needsHumanReview: true,
       };
+    }
+  } else {
+    try {
+      const out = await openaiDiagnose(text, rag.hits);
+      diagnosis = finalizeDiagnosis(out.diagnosis, truncated, injection, rag);
+      model = out.model;
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "llm error";
+      if (mode === "openai") {
+        throw err;
+      }
+      // auto: try Ollama before mock if reachable
+      if (await ollamaReachable()) {
+        try {
+          const out = await ollamaDiagnose(text, rag.hits);
+          diagnosis = finalizeDiagnosis(
+            out.diagnosis,
+            truncated,
+            injection,
+            rag,
+          );
+          model = out.model;
+          fallbackReason = `openai failed → ollama: ${reason}`;
+        } catch (ollamaErr) {
+          const oReason =
+            ollamaErr instanceof Error ? ollamaErr.message : "ollama error";
+          fellBackToMock = true;
+          fallbackReason = `${reason}; ollama: ${oReason}`;
+          diagnosis = finalizeDiagnosis(
+            mockDiagnose(text),
+            truncated,
+            injection,
+            rag,
+          );
+          diagnosis = {
+            ...diagnosis,
+            summary: `${diagnosis.summary} [fell back to mock: ${fallbackReason}]`,
+            needsHumanReview: true,
+          };
+        }
+      } else {
+        fellBackToMock = true;
+        fallbackReason = reason;
+        diagnosis = finalizeDiagnosis(
+          mockDiagnose(text),
+          truncated,
+          injection,
+          rag,
+        );
+        diagnosis = {
+          ...diagnosis,
+          summary: `${diagnosis.summary} [fell back to mock: ${reason}]`,
+          needsHumanReview: true,
+        };
+      }
     }
   }
 

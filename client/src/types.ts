@@ -1,4 +1,4 @@
-export type Provider = "mock" | "openai";
+export type Provider = "mock" | "openai" | "ollama";
 
 export type Diagnosis = {
   provider: Provider;
@@ -17,7 +17,7 @@ export type DiagnoseResponse = {
   meta: {
     logChars: number;
     fixtureHint: string | null;
-    mode: "auto" | "mock" | "openai";
+    mode: "auto" | "mock" | "openai" | "ollama";
     fellBackToMock: boolean;
     fallbackReason: string | null;
     model: string | null;

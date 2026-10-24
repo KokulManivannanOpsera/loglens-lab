@@ -3,7 +3,7 @@ import type { Diagnosis } from "./types.js";
 import { wrapLogForPrompt } from "./promptGuard.js";
 import { formatRunbooksForPrompt, type RagHit } from "./rag.js";
 
-const SYSTEM = `You are LogLens, a CI failure diagnosis assistant.
+export const DIAGNOSE_SYSTEM_PROMPT = `You are LogLens, a CI failure diagnosis assistant.
 
 Return ONLY valid JSON matching this schema (no markdown fences):
 {
@@ -32,7 +32,19 @@ function isConfidence(v: unknown): v is Diagnosis["confidence"] {
   return v === "low" || v === "medium" || v === "high";
 }
 
-function parseDiagnosisJson(raw: string): LlmFields {
+export function buildDiagnoseUserContent(
+  logText: string,
+  ragHits: RagHit[] = [],
+): string {
+  return [
+    "RUNBOOK CONTEXT (team docs — may be stale; secondary to the log):",
+    formatRunbooksForPrompt(ragHits),
+    "",
+    wrapLogForPrompt(logText),
+  ].join("\n");
+}
+
+export function parseDiagnosisJson(raw: string): LlmFields {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
   const data = JSON.parse(cleaned) as Record<string, unknown>;
 
@@ -80,12 +92,7 @@ export async function openaiDiagnose(
   const timeoutMs = Number(process.env.OPENAI_TIMEOUT_MS || 45_000);
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  const userContent = [
-    "RUNBOOK CONTEXT (team docs — may be stale; secondary to the log):",
-    formatRunbooksForPrompt(ragHits),
-    "",
-    wrapLogForPrompt(logText),
-  ].join("\n");
+  const userContent = buildDiagnoseUserContent(logText, ragHits);
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -100,7 +107,7 @@ export async function openaiDiagnose(
         temperature: 0.2,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: SYSTEM },
+          { role: "system", content: DIAGNOSE_SYSTEM_PROMPT },
           { role: "user", content: userContent },
         ],
       }),

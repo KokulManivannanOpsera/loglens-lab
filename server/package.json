@@ -9,7 +9,8 @@
     "start": "tsx src/index.ts",
     "start:prod": "node dist/index.js",
     "test": "node --import tsx --test tests/*.test.ts",
-    "eval": "tsx scripts/run-evals.ts"
+    "eval": "tsx scripts/run-evals.ts",
+    "export:history": "tsx scripts/export-history.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

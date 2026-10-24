@@ -18,7 +18,15 @@
     "build": "npm run build --workspace=server && npm run build --workspace=client",
     "docker:build": "docker build -f ai/Dockerfile -t loglens-ai:0.1 . && docker build -f server/Dockerfile -t loglens-api:0.1 . && docker build -f client/Dockerfile -t loglens-web:0.1 .",
     "docker:up": "docker compose up --build",
-    "docker:down": "docker compose down"
+    "docker:down": "docker compose down",
+    "load:k6": "k6 run scripts/load/smoke.js",
+    "export:history": "npm run export:history --workspace=server",
+    "etl:duckdb": "python3 scripts/etl/load_duckdb.py",
+    "iac:init": "cd infra/terraform && terraform init",
+    "iac:plan": "cd infra/terraform && terraform plan",
+    "iac:apply": "cd infra/terraform && terraform apply",
+    "iac:destroy": "cd infra/terraform && terraform destroy",
+    "iac:checkov": "checkov -d infra/terraform --framework terraform"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

@@ -59,12 +59,13 @@ npm test
 - Tracker: [LEARNING.md](./LEARNING.md)
 - Agents: [AGENTS.md](./AGENTS.md)
 - Streaming: [STREAM.md](./STREAM.md)
-- Early bringables: [BRING.md](./BRING.md) · [DESIGN.md](./DESIGN.md)
+- Bringables: [BRING.md](./BRING.md) · [DESIGN.md](./DESIGN.md) · [LOAD.md](./LOAD.md)
 - Feedback: [FEEDBACK.md](./FEEDBACK.md)
+- IaC: [IAC.md](./IAC.md)
 - Flow diagram: [PRODUCT_FLOW.html](./PRODUCT_FLOW.html)
 - Git/PR: [GIT_PR.md](./GIT_PR.md)
 
 | Track | Next |
 |-------|------|
-| AI | mid BRING / A7 optional |
-| DevOps | BRING mid / D11 IaC |
+| AI | A7 optional |
+| DevOps | D12 Kubernetes |
